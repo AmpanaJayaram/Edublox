@@ -1,0 +1,424 @@
+{% extends "base.html" %}
+{% block title %}Compare Universities — UniSearch{% endblock %}
+{% block body %}
+
+<style>
+.cmp-hero {
+  background:var(--navy); padding:3rem 2rem 2.5rem; position:relative; overflow:hidden;
+}
+.cmp-hero::before {
+  content:''; position:absolute; inset:0;
+  background:radial-gradient(ellipse 60% 80% at 80% 50%, rgba(201,146,42,.08),transparent 60%);
+  pointer-events:none;
+}
+.cmp-hero-inner { max-width:1360px; margin:0 auto; position:relative; z-index:1; }
+.cmp-title { font-family:'Cormorant Garamond',serif; font-size:3rem; font-weight:600; color:#fff; line-height:1; margin-bottom:.5rem; }
+.cmp-sub   { font-size:15px; color:rgba(255,255,255,.5); }
+
+.cmp-search-section {
+  background:var(--white); border-bottom:1px solid var(--border);
+  padding:1.25rem 2rem; position:sticky; top:62px; z-index:100;
+  box-shadow:0 2px 12px rgba(0,0,0,.06);
+}
+.cmp-search-inner { max-width:900px; margin:0 auto; position:relative; }
+.cmp-search-row { display:flex; align-items:center; gap:1rem; }
+.cmp-search-box {
+  flex:1; display:flex; align-items:center; gap:.75rem;
+  background:var(--cream); border:1.5px solid var(--border); border-radius:12px;
+  padding:.75rem 1rem; transition:border-color .15s;
+}
+.cmp-search-box:focus-within { border-color:var(--navy); background:#fff; }
+.cmp-search-box input {
+  flex:1; background:none; border:none; outline:none;
+  font-family:'Outfit',sans-serif; font-size:15px; color:var(--text);
+}
+.cmp-search-box input::placeholder { color:var(--text-muted); }
+.pill { background:var(--navy); color:#fff; font-size:11px; font-weight:700; padding:4px 12px; border-radius:20px; white-space:nowrap; }
+.pill.has-ids { background:var(--gold); color:var(--navy); }
+
+.cmp-dropdown {
+  position:absolute; top:calc(100% + 8px); left:0; right:0;
+  background:#fff; border:1px solid var(--border); border-radius:12px;
+  box-shadow:0 12px 40px rgba(0,0,0,.13); z-index:999; overflow:hidden; display:none;
+}
+.drop-item {
+  display:flex; align-items:center; gap:.75rem; padding:.9rem 1rem;
+  cursor:pointer; transition:background .12s; border-bottom:1px solid var(--border-soft);
+}
+.drop-item:last-child { border-bottom:none; }
+.drop-item:hover:not(.already) { background:var(--cream); }
+.drop-item.already { opacity:.5; cursor:default; }
+.drop-name  { flex:1; font-weight:600; font-size:14px; color:var(--text); }
+.drop-loc   { font-size:12px; color:var(--text-muted); white-space:nowrap; }
+.drop-add   { font-size:11px; font-weight:700; color:var(--gold); background:var(--gold-pale); padding:3px 10px; border-radius:20px; }
+.drop-added { font-size:11px; color:var(--text-muted); }
+
+.cmp-empty {
+  max-width:500px; margin:5rem auto; padding:2rem; text-align:center;
+  display:flex; flex-direction:column; align-items:center; gap:1rem;
+}
+.cmp-empty-icon { font-size:4rem; opacity:.2; }
+.cmp-empty h3 { font-family:'Cormorant Garamond',serif; font-size:2rem; color:var(--text); }
+.cmp-empty p  { font-size:15px; color:var(--text-muted); }
+
+.cmp-wrap { max-width:1400px; margin:0 auto; padding:1.75rem 1.5rem 5rem; }
+
+/* Grid uses inline style - no CSS vars needed */
+.cmp-grid { display:grid; gap:12px; }
+
+.cmp-uni-card {
+  background:#fff; border:1.5px solid var(--border); border-radius:14px;
+  padding:1.25rem 1rem; text-align:center; position:relative;
+  transition:box-shadow .15s;
+}
+.cmp-uni-card:hover { box-shadow:0 6px 24px rgba(0,0,0,.09); }
+.cmp-tier-bar { position:absolute; top:0; left:0; right:0; height:4px; border-radius:14px 14px 0 0; }
+.cmp-tier-bar.t1 { background:var(--t1-accent); }
+.cmp-tier-bar.t2 { background:var(--t2-accent); }
+.cmp-tier-bar.t3 { background:var(--border); }
+.cmp-card-name { font-family:'Cormorant Garamond',serif; font-size:1rem; font-weight:700; color:var(--text); line-height:1.3; margin:.75rem 0 .25rem; }
+.cmp-card-name a { color:inherit; text-decoration:none; }
+.cmp-card-name a:hover { color:var(--gold); }
+.cmp-card-loc  { font-size:11.5px; color:var(--text-muted); margin-bottom:.875rem; }
+.cmp-card-actions { display:flex; gap:.375rem; justify-content:center; flex-wrap:wrap; }
+.cbtn { font-size:11px; font-weight:600; padding:5px 11px; border-radius:8px; border:1.5px solid var(--border); background:var(--cream); color:var(--text-mid); cursor:pointer; transition:all .15s; text-decoration:none; display:inline-block; }
+.cbtn:hover { border-color:var(--navy); color:var(--navy); background:#fff; }
+.cbtn.saved { border-color:var(--gold); color:var(--gold); background:var(--gold-pale); }
+.cbtn.remove:hover { border-color:#ef4444; color:#ef4444; }
+
+.cmp-ai-bar {
+  background:linear-gradient(135deg,var(--navy),#16326b); border-radius:14px; padding:1.25rem 1.5rem;
+  margin-bottom:12px; border:1px solid rgba(201,146,42,.2);
+}
+.cmp-ai-top { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.ai-icon { width:40px; height:40px; border-radius:10px; flex-shrink:0; background:linear-gradient(135deg,var(--gold),var(--gold-light)); display:flex; align-items:center; justify-content:center; font-size:18px; color:var(--navy); }
+.ai-label { font-size:14px; font-weight:700; color:#fff; }
+.ai-sub   { font-size:12px; color:rgba(255,255,255,.45); margin-top:2px; }
+.ai-result { margin-top:1.25rem; padding:1.25rem; border-radius:10px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1); display:none; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.ai-spin { width:15px; height:15px; border-radius:50%; border:2px solid rgba(255,255,255,.15); border-top-color:var(--gold-light); animation:spin .7s linear infinite; display:inline-block; vertical-align:middle; margin-right:8px; }
+
+/* Rich AI analysis styles */
+.ai-header-label { font-size:11px;color:rgba(255,255,255,.4);font-weight:700;letter-spacing:.07em;text-transform:uppercase;margin-bottom:1rem;display:flex;align-items:center;gap:.5rem; }
+.ai-section { margin-bottom:1.25rem; }
+.ai-section-title { font-size:13px;font-weight:800;color:var(--gold);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.75rem;display:flex;align-items:center;gap:.5rem; }
+.ai-uni-block { background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:1rem 1.1rem;margin-bottom:.65rem; }
+.ai-uni-name { font-size:14px;font-weight:800;color:#fff;margin-bottom:.4rem; }
+.ai-uni-desc { font-size:13px;color:rgba(255,255,255,.78);line-height:1.7;margin-bottom:.6rem; }
+.ai-uni-stats { display:flex;flex-wrap:wrap;gap:.4rem; }
+.ai-stat-chip { font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:rgba(201,146,42,.2);color:var(--gold);border:1px solid rgba(201,146,42,.25); }
+.ai-winner-row { display:flex;align-items:center;gap:.75rem;padding:.6rem 0;border-bottom:1px solid rgba(255,255,255,.07); }
+.ai-winner-row:last-child { border-bottom:none; }
+.ai-winner-cat  { font-size:11px;font-weight:700;color:rgba(255,255,255,.5);width:140px;flex-shrink:0;text-transform:uppercase;letter-spacing:.04em; }
+.ai-winner-name { font-size:13px;font-weight:800;color:var(--gold);min-width:160px;flex-shrink:0; }
+.ai-winner-why  { font-size:12.5px;color:rgba(255,255,255,.65);line-height:1.5; }
+.ai-insight { font-size:13px;color:rgba(255,255,255,.8);line-height:1.65;padding:.5rem .75rem;background:rgba(255,255,255,.05);border-left:3px solid var(--gold);border-radius:0 7px 7px 0;margin-bottom:.5rem; }
+.ai-verdict { background:rgba(201,146,42,.12);border:1px solid rgba(201,146,42,.3);border-radius:10px;padding:1rem 1.1rem;margin-top:1rem; }
+.ai-verdict-title { font-size:13px;font-weight:800;color:var(--gold);margin-bottom:.5rem; }
+.ai-verdict p, .ai-verdict { font-size:13.5px;color:rgba(255,255,255,.85);line-height:1.75; }
+
+.cmp-section { background:#fff; border:1px solid var(--border); border-radius:14px; overflow:hidden; margin-bottom:10px; }
+
+/* Section header row */
+.sec-head-row { display:grid; background:var(--navy); }
+.sec-title-cell { padding:.9rem 1rem; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:rgba(255,255,255,.5); display:flex; align-items:center; gap:7px; }
+.sec-uni-cell   { padding:.9rem .75rem; text-align:center; font-size:12px; font-weight:600; color:rgba(255,255,255,.65); border-left:1px solid rgba(255,255,255,.07); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+/* Data row */
+.data-row  { display:grid; border-top:1px solid var(--border-soft); }
+.row-label { padding:.9rem 1rem; font-size:13px; color:var(--text-mid); display:flex; align-items:center; gap:7px; }
+.row-cell  { padding:.9rem .75rem; text-align:center; border-left:1px solid var(--border-soft); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; }
+.val       { font-size:15px; font-weight:700; color:var(--text); }
+.val.best  { color:#15803d; }
+.val.worst { color:#dc2626; }
+.val.na    { font-size:13px; font-weight:400; color:var(--text-muted); }
+.bar-wrap  { width:70px; height:4px; background:var(--border); border-radius:2px; }
+.bar-fill  { height:100%; border-radius:2px; background:var(--navy); }
+.bar-fill.best  { background:#15803d; }
+.bar-fill.worst { background:#dc2626; }
+</style>
+
+<section class="cmp-hero">
+  <div class="cmp-hero-inner">
+    <div class="hero-eyebrow" style="margin-bottom:.6rem"><span class="hero-eyebrow-dash"></span> Side-by-Side <span class="hero-eyebrow-dash"></span></div>
+    <h1 class="cmp-title">Compare Universities</h1>
+    <p class="cmp-sub">Add up to 4 universities and compare them across every metric — with AI analysis.</p>
+  </div>
+</section>
+
+<div class="cmp-search-section">
+  <div class="cmp-search-inner">
+    <div class="cmp-search-row">
+      <div class="cmp-search-box">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input type="text" id="cmpSearch" placeholder="Search to add a university…" autocomplete="off"/>
+      </div>
+      <span class="pill" id="countPill">0 / 4</span>
+      <button onclick="clearAll()" style="font-size:12px;color:var(--text-muted);background:none;border:none;cursor:pointer;padding:4px 8px;border-radius:6px;transition:color .15s" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='var(--text-muted)'">Clear all</button>
+    </div>
+    <div class="cmp-dropdown" id="cmpDropdown"></div>
+  </div>
+</div>
+
+<div class="cmp-empty" id="cmpEmpty">
+  <div class="cmp-empty-icon">⇄</div>
+  <h3>Nothing to compare yet</h3>
+  <p>Search above to add universities, or click <strong>Compare</strong> on any university profile.</p>
+  <a href="/" class="btn-gold" style="display:inline-flex;align-items:center;gap:8px;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:700;color:var(--navy)">Browse Universities →</a>
+</div>
+
+<div class="cmp-wrap" id="cmpWrap" style="display:none">
+  <div id="cmpHeaders" class="cmp-grid" style="margin-bottom:12px"></div>
+  <div class="cmp-ai-bar" id="aiBar">
+    <div class="cmp-ai-top">
+      <div class="ai-icon">✦</div>
+      <div><div class="ai-label">AI Analysis</div><div class="ai-sub">Get AI comparison and recommendations</div></div>
+      <button class="btn-gold" id="aiBtn" onclick="runAI()" style="margin-left:auto;padding:9px 20px;font-size:13px;font-weight:700;color:var(--navy);cursor:pointer;border:none;border-radius:9px">✦ Analyze with AI</button>
+    </div>
+    <div class="ai-result" id="aiResult"></div>
+  </div>
+  <div id="cmpSections"></div>
+</div>
+
+<script>
+let compareIds = JSON.parse(localStorage.getItem('compareIds') || '[]');
+let favorites  = JSON.parse(localStorage.getItem('favorites')  || '[]');
+compareIds = [...new Set(compareIds.filter(id => +id > 0).map(id => +id))];
+let unis = [], timer;
+
+const addId = new URLSearchParams(location.search).get('add');
+if (addId && !compareIds.includes(+addId)) { compareIds.push(+addId); compareIds = compareIds.slice(0,4); }
+save();
+
+const fmtD   = n => n != null ? '$' + Number(n).toLocaleString() : null;
+const fmtPct = n => n == null ? null : (n > 1 ? Math.round(n) : Math.round(n*100)) + '%';
+const fmtN   = n => n == null ? null : n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?Math.round(n/1e3)+'K':Number(n).toLocaleString();
+const fmtSpd = n => !n ? null : n>=1e9?'$'+(n/1e9).toFixed(1)+'B':n>=1e6?'$'+(n/1e6).toFixed(1)+'M':'$'+(n/1e3).toFixed(0)+'K';
+const tCls   = t => t==='T1'?'t1':t==='T2'?'t2':'t3';
+
+function fNum(u, sec, lbl) {
+  return (u.facts?.[sec]||[]).find(f=>f.label?.toLowerCase().includes(lbl.toLowerCase()))?.value_numeric ?? null;
+}
+function save() { localStorage.setItem('compareIds', JSON.stringify(compareIds)); }
+function pill() {
+  const el = document.getElementById('countPill');
+  el.textContent = compareIds.length + ' / 4';
+  el.className = 'pill' + (compareIds.length ? ' has-ids' : '');
+}
+
+async function boot() {
+  setupSearch();
+  pill();
+  if (compareIds.length) await load();
+  else showEmpty();
+}
+boot();
+
+async function load() {
+  pill();
+  if (!compareIds.length) { showEmpty(); return; }
+  document.getElementById('cmpEmpty').style.display = 'none';
+  document.getElementById('cmpWrap').style.display  = 'block';
+  document.getElementById('cmpSections').innerHTML  = `<div style="padding:2.5rem;text-align:center;color:var(--text-muted);font-size:14px">
+    <div class="ai-spin" style="display:inline-block;margin-right:8px;border-top-color:var(--navy)"></div> Loading universities…</div>`;
+
+  try {
+    const r = await fetch('/api/compare_fast?' + compareIds.map(id=>'ids='+id).join('&'));
+    if (!r.ok) throw new Error('Server error ' + r.status);
+    const data = await r.json();
+    unis = (Array.isArray(data) ? data : []).filter(u => u?.id);
+    if (!unis.length) {
+      // IDs in localStorage don't match any university in DB — wipe them
+      compareIds = []; save(); pill(); showEmpty(); return;
+    }
+    compareIds = unis.map(u => u.id); save(); pill();
+    render();
+  } catch(e) {
+    document.getElementById('cmpSections').innerHTML = `<div style="padding:2.5rem;text-align:center;color:#dc2626;font-size:14px">
+      Error: ${e.message} — <button onclick="clearAll()" style="color:var(--gold);background:none;border:none;cursor:pointer;font-weight:700">Clear & reset</button></div>`;
+  }
+}
+
+function showEmpty() {
+  document.getElementById('cmpEmpty').style.display = 'flex';
+  document.getElementById('cmpWrap').style.display  = 'none';
+}
+
+function clearAll() {
+  compareIds = []; unis = []; save(); pill(); showEmpty();
+}
+
+// ── Render everything ──────────────────────────────────────
+function render() {
+  const n = unis.length;
+  // grid = label col + n data cols
+  const gridCols = `210px repeat(${n}, 1fr)`;
+
+  // Header cards
+  const hdrs = document.getElementById('cmpHeaders');
+  hdrs.style.gridTemplateColumns = `repeat(${n}, 1fr)`;
+  hdrs.innerHTML = unis.map(u => {
+    const sv = favorites.includes(u.id);
+    return `<div class="cmp-uni-card">
+      <div class="cmp-tier-bar ${tCls(u.tier)}"></div>
+      <div style="margin:.65rem 0 .25rem"><span class="tier-tag ${tCls(u.tier)}"><span class="dot"></span>${u.tier||'T3'}</span></div>
+      <div class="cmp-card-name"><a href="/university/${u.id}">${u.name}</a></div>
+      <div class="cmp-card-loc">${[u.city,u.state].filter(Boolean).join(', ')}</div>
+      <div class="cmp-card-actions">
+        <button class="cbtn ${sv?'saved':''}" id="fav-${u.id}" onclick="toggleFav(${u.id})">${sv?'♥ Saved':'♡ Save'}</button>
+        <a href="/university/${u.id}" class="cbtn">View →</a>
+        <button class="cbtn remove" onclick="removeU(${u.id})">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Sections
+  const DEFS = [
+    { title:'Overview', icon:'▦', rows:[
+      { lbl:'State',            icon:'📍', get:u=>({d:u.state||'—',v:null}) },
+      { lbl:'Institution Type', icon:'🏛️', get:u=>({d:u.carnegie?.institution_control||u.institution_type_inferred||'—',v:null}) },
+      { lbl:'Carnegie Tier',    icon:'🎓', get:u=>({d:u.tier||'T3',v:null}) },
+      { lbl:'Enrollment',       icon:'👥', get:u=>{ const v=fNum(u,'student_life','Total Enrollment'); return {d:fmtN(v)||'—',v}; }, hb:true },
+    ]},
+    { title:'Admissions', icon:'👤', rows:[
+      { lbl:'Acceptance Rate',   icon:'🎯', get:u=>{ const v=fNum(u,'admissions','Acceptance Rate');   return {d:fmtPct(v)||'—',v}; }, hb:false },
+      { lbl:'Average SAT Score', icon:'📝', get:u=>{ const v=fNum(u,'admissions','Average SAT');       return {d:v?Number(v).toLocaleString():'—',v}; }, hb:true },
+      { lbl:'Average ACT Score', icon:'📋', get:u=>{ const v=fNum(u,'admissions','Average ACT');       return {d:v?Number(v).toLocaleString():'—',v}; }, hb:true },
+    ]},
+    { title:'Costs & Aid', icon:'$', rows:[
+      { lbl:'In-State Tuition',        icon:'💰', get:u=>{ const v=fNum(u,'tuition','In-State');        return {d:fmtD(v)||'—',v}; }, hb:false },
+      { lbl:'Out-of-State Tuition',    icon:'✈️', get:u=>{ const v=fNum(u,'tuition','Out-of-State');    return {d:fmtD(v)||'—',v}; }, hb:false },
+      { lbl:'Total Cost of Attendance',icon:'🧾', get:u=>{ const v=fNum(u,'tuition','Total Cost');      return {d:fmtD(v)||'—',v}; }, hb:false },
+      { lbl:'Median Student Debt',     icon:'💳', get:u=>{ const v=fNum(u,'outcomes','Median Student Debt'); return {d:fmtD(v)||'—',v}; }, hb:false },
+    ]},
+    { title:'Student Outcomes', icon:'↗', rows:[
+      { lbl:'4-Year Graduation Rate', icon:'🎓', get:u=>{ const v=fNum(u,'outcomes','4-Year Graduation'); return {d:fmtPct(v)||'—',v}; }, hb:true },
+      { lbl:'Median Earnings (10yr)', icon:'💼', get:u=>{ const v=fNum(u,'outcomes','Median Earnings');   return {d:fmtD(v)||'—',v}; }, hb:true },
+    ]},
+    { title:'Research & Faculty', icon:'🔬', rows:[
+      { lbl:'Annual R&D Spending',  icon:'🔭', get:u=>{ const v=u.carnegie?.research_spending;    return {d:fmtSpd(v)||'—',v}; }, hb:true },
+      { lbl:'Research Doctorates',  icon:'📜', get:u=>{ const v=u.carnegie?.research_doctorates;  return {d:v?Number(v).toLocaleString():'—',v}; }, hb:true },
+      { lbl:'Full-Time Faculty',    icon:'👩‍🏫', get:u=>{ const v=u.carnegie?.faculty_count;        return {d:v?Number(v).toLocaleString():'—',v}; }, hb:true },
+    ]},
+  ];
+
+  document.getElementById('cmpSections').innerHTML = DEFS.map(sec => {
+    const headRow = `<div class="sec-head-row" style="grid-template-columns:${gridCols}">
+      <div class="sec-title-cell">${sec.icon} ${sec.title}</div>
+      ${unis.map(u=>`<div class="sec-uni-cell">${u.name.split(' ').slice(0,3).join(' ')}</div>`).join('')}
+    </div>`;
+
+    const dataRows = sec.rows.map(row => {
+      const vals  = unis.map(u => row.get(u));
+      const nums  = vals.map(v=>v.v).filter(v=>v!=null&&!isNaN(v));
+      const best  = nums.length>1 ? (row.hb===true?Math.max(...nums):row.hb===false?Math.min(...nums):null) : null;
+      const worst = nums.length>1 ? (row.hb===true?Math.min(...nums):row.hb===false?Math.max(...nums):null) : null;
+      const maxN  = nums.length ? Math.max(...nums) : 1;
+
+      const cells = vals.map(v => {
+        let cls = v.d==='—'?'na':'';
+        if (v.v!=null && nums.length>1) { if(v.v===best) cls='best'; else if(v.v===worst) cls='worst'; }
+        const pct = v.v!=null&&maxN>0 ? Math.round((v.v/maxN)*100) : 0;
+        return `<div class="row-cell">
+          <div class="val ${cls}">${v.d}</div>
+          ${v.v!=null&&nums.length>1?`<div class="bar-wrap"><div class="bar-fill ${cls}" style="width:${pct}%"></div></div>`:''}
+        </div>`;
+      }).join('');
+
+      return `<div class="data-row" style="grid-template-columns:${gridCols}">
+        <div class="row-label">${row.icon} ${row.lbl}</div>
+        ${cells}
+      </div>`;
+    }).join('');
+
+    return `<div class="cmp-section">${headRow}${dataRows}</div>`;
+  }).join('');
+}
+
+// ── AI Analysis ────────────────────────────────────────────
+async function runAI() {
+  const btn = document.getElementById('aiBtn');
+  const res  = document.getElementById('aiResult');
+  btn.disabled=true; btn.innerHTML='<span class="ai-spin"></span> Analyzing…';
+  res.style.display='block';
+  res.innerHTML='<span class="ai-spin"></span>AI is analyzing these universities…';
+
+  const ctx = unis.map(u => {
+    const acc  = fNum(u,'admissions','Acceptance Rate');
+    const tuit = fNum(u,'tuition','In-State');
+    const grad = fNum(u,'outcomes','4-Year Graduation');
+    const earn = fNum(u,'outcomes','Median Earnings');
+    return `${u.name} (${u.state||'?'}): Tier=${u.tier} | Type=${u.carnegie?.institution_control||'?'} | Acceptance=${acc!=null?(acc>1?Math.round(acc):Math.round(acc*100))+'%':'N/A'} | Tuition=${tuit?'$'+Number(tuit).toLocaleString():'N/A'} | GradRate=${grad!=null?(grad>1?Math.round(grad):Math.round(grad*100))+'%':'N/A'} | Earnings=${earn?'$'+Number(earn).toLocaleString():'N/A'} | R&D=${u.carnegie?.research_spending?'$'+(u.carnegie.research_spending/1e6).toFixed(0)+'M':'N/A'}`;
+  }).join('\n');
+
+  try {
+    const r = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ context: ctx })
+    });
+    const d = await r.json();
+    if (!r.ok || d.error) throw new Error(d.error || 'Server error');
+    res.innerHTML = `
+      <div class="ai-header-label">✦ AI Analysis by Llama 3.3 · Powered by Groq</div>
+      ${d.result}
+    `;
+  } catch(e) {
+    res.innerHTML = `<span style="color:rgba(255,255,255,.5)">AI analysis unavailable: ${e.message}.<br><small style="opacity:.6">Make sure ANTHROPIC_API_KEY is set on the server.</small></span>`;
+  }
+  btn.disabled=false; btn.innerHTML='✦ Re-analyze';
+}
+
+// ── Search ─────────────────────────────────────────────────
+function setupSearch() {
+  const inp=document.getElementById('cmpSearch'), drop=document.getElementById('cmpDropdown');
+  inp.addEventListener('input', e => {
+    clearTimeout(timer);
+    const q=e.target.value.trim();
+    if(q.length<2){drop.style.display='none';return;}
+    timer=setTimeout(()=>doSearch(q),280);
+  });
+  document.addEventListener('click', e=>{
+    if(!e.target.closest('.cmp-search-inner')) drop.style.display='none';
+  });
+}
+
+async function doSearch(q) {
+  const r=await fetch(`/api/universities?q=${encodeURIComponent(q)}&page=1`);
+  const d=await r.json();
+  const drop=document.getElementById('cmpDropdown');
+  const items=d.results?.slice(0,8)||[];
+  if(!items.length){drop.style.display='none';return;}
+  drop.innerHTML=items.map(u=>{
+    const added=compareIds.includes(u.id);
+    return `<div class="drop-item ${added?'already':''}" ${!added?`onclick="addUni(${u.id})"`:''}>
+      <div style="flex:1"><div class="drop-name">${u.name}</div><div class="drop-loc">${[u.city,u.state].filter(Boolean).join(', ')}</div></div>
+      ${added?'<span class="drop-added">Added ✓</span>':'<span class="drop-add">+ Add</span>'}
+    </div>`;
+  }).join('');
+  drop.style.display='block';
+}
+
+async function addUni(id) {
+  if(compareIds.includes(id))return;
+  if(compareIds.length>=4){alert('Max 4 universities.');return;}
+  compareIds.push(id); save();
+  document.getElementById('cmpDropdown').style.display='none';
+  document.getElementById('cmpSearch').value='';
+  await load();
+}
+
+function removeU(id) {
+  compareIds=compareIds.filter(i=>i!==id); unis=unis.filter(u=>u.id!==id); save(); pill();
+  if(!unis.length) showEmpty(); else render();
+}
+
+function toggleFav(id) {
+  const i=favorites.indexOf(id);
+  if(i>-1)favorites.splice(i,1);else favorites.push(id);
+  localStorage.setItem('favorites',JSON.stringify(favorites));
+  const btn=document.getElementById('fav-'+id), s=favorites.includes(id);
+  if(btn){btn.textContent=s?'♥ Saved':'♡ Save';btn.classList.toggle('saved',s);}
+}
+</script>
+{% endblock %}

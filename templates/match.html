@@ -1,0 +1,664 @@
+{% extends "base.html" %}
+{% block title %}Find Your Match — UniSearch{% endblock %}
+{% block body %}
+
+<style>
+/* ── Match Page ─────────────────────────────────────────────── */
+.match-hero {
+  background:var(--navy); padding:3.5rem 2rem 3rem; position:relative; overflow:hidden;
+}
+.match-hero::before {
+  content:''; position:absolute; inset:0;
+  background: radial-gradient(ellipse 50% 100% at 100% 50%, rgba(201,146,42,.1), transparent 60%),
+              radial-gradient(ellipse 30% 60% at 10% 80%, rgba(16,50,107,.5), transparent 50%);
+  pointer-events:none;
+}
+.match-hero-inner { max-width:760px; margin:0 auto; position:relative; z-index:1; text-align:center; }
+.match-title { font-family:'Cormorant Garamond',serif; font-size:3.5rem; font-weight:600; color:#fff; line-height:1.1; margin-bottom:.75rem; }
+.match-title em { color:var(--gold-light); font-style:italic; }
+.match-sub { font-size:16px; color:rgba(255,255,255,.5); max-width:520px; margin:0 auto; line-height:1.6; }
+
+/* ── Steps progress ────────────────────────────────────────── */
+.match-steps-bar { background:rgba(255,255,255,.04); border-top:1px solid rgba(255,255,255,.08); }
+.match-steps { max-width:760px; margin:0 auto; display:flex; padding:.5rem 2rem; }
+.match-step {
+  flex:1; text-align:center; padding:.75rem .5rem; position:relative;
+  font-size:12px; font-weight:600; color:rgba(255,255,255,.25); letter-spacing:.05em;
+  text-transform:uppercase; transition:color .25s; display:flex; align-items:center; justify-content:center; gap:7px;
+}
+.match-step.active { color:var(--gold-light); }
+.match-step.done   { color:rgba(255,255,255,.45); }
+.step-num {
+  width:22px; height:22px; border-radius:50%; font-size:11px; font-weight:800;
+  display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  border:1.5px solid rgba(255,255,255,.15); color:rgba(255,255,255,.3);
+  transition:all .25s;
+}
+.match-step.active .step-num { border-color:var(--gold); background:var(--gold); color:var(--navy); }
+.match-step.done .step-num   { border-color:rgba(255,255,255,.4); color:rgba(255,255,255,.5); }
+
+/* ── Wizard body ───────────────────────────────────────────── */
+.match-body { max-width:760px; margin:0 auto; padding:2.5rem 2rem 5rem; }
+
+.wiz-step { display:none; }
+.wiz-step.active { display:block; animation:fadeUp .3s ease; }
+@keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:none; } }
+
+.wiz-q { margin-bottom:2rem; }
+.wiz-q-label {
+  font-family:'Cormorant Garamond',serif; font-size:1.75rem; font-weight:600;
+  color:var(--text); margin-bottom:.375rem;
+}
+.wiz-q-sub { font-size:14px; color:var(--text-muted); }
+
+/* Option grid */
+.opt-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:.75rem; margin-top:1rem; }
+.opt-card {
+  border:2px solid var(--border); border-radius:12px; padding:1rem;
+  cursor:pointer; transition:all .15s; text-align:center;
+  background:var(--white); user-select:none;
+}
+.opt-card:hover { border-color:var(--navy); transform:translateY(-2px); box-shadow:0 4px 16px rgba(0,0,0,.08); }
+.opt-card.sel { border-color:var(--navy); background:var(--navy); color:#fff; box-shadow:0 4px 20px rgba(14,31,61,.25); }
+.opt-card.sel .opt-icon { color:var(--gold-light); }
+.opt-card.sel .opt-label { color:#fff; }
+.opt-card.sel .opt-sub   { color:rgba(255,255,255,.5); }
+.opt-icon  { font-size:1.75rem; margin-bottom:.5rem; display:block; }
+.opt-label { font-weight:700; font-size:14px; color:var(--text); }
+.opt-sub   { font-size:12px; color:var(--text-muted); margin-top:3px; }
+
+/* Range sliders */
+.range-group { margin-top:1.25rem; }
+.range-row { margin-bottom:1.5rem; }
+.range-lbl { font-size:14px; font-weight:600; color:var(--text-mid); margin-bottom:.5rem; display:flex; justify-content:space-between; }
+.range-lbl span { color:var(--gold); font-weight:700; }
+input[type=range] {
+  width:100%; -webkit-appearance:none; height:5px;
+  background:linear-gradient(to right, var(--navy) 0%, var(--navy) var(--pct,0%), var(--border) var(--pct,0%));
+  border-radius:3px; outline:none; cursor:pointer;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance:none; width:18px; height:18px; border-radius:50%;
+  background:var(--navy); border:3px solid #fff; box-shadow:0 2px 8px rgba(0,0,0,.2); cursor:pointer;
+}
+
+/* Text input */
+.wiz-input {
+  width:100%; padding:.875rem 1rem; border:2px solid var(--border);
+  border-radius:12px; font-family:'Outfit',sans-serif; font-size:15px;
+  color:var(--text); background:var(--white); outline:none; margin-top:.75rem;
+  transition:border-color .15s; box-sizing:border-box;
+}
+.wiz-input:focus { border-color:var(--navy); }
+
+/* Checkbox list */
+.check-list { display:flex; flex-direction:column; gap:.5rem; margin-top:1rem; }
+.check-item {
+  display:flex; align-items:center; gap:.875rem;
+  padding:.875rem 1rem; border:2px solid var(--border); border-radius:11px;
+  cursor:pointer; transition:all .15s; background:var(--white);
+}
+.check-item:hover { border-color:var(--navy); background:var(--cream); }
+.check-item.sel { border-color:var(--navy); background:var(--navy); }
+.check-item.sel .ci-label { color:#fff; }
+.check-item.sel .ci-sub   { color:rgba(255,255,255,.5); }
+.check-cb {
+  width:20px; height:20px; border:2px solid var(--border); border-radius:5px;
+  flex-shrink:0; display:flex; align-items:center; justify-content:center;
+  font-size:12px; font-weight:800; transition:all .15s;
+}
+.check-item.sel .check-cb { border-color:var(--gold); background:var(--gold); color:var(--navy); }
+.ci-label { font-weight:600; font-size:14px; color:var(--text); flex:1; }
+.ci-sub   { font-size:12px; color:var(--text-muted); }
+
+/* Nav buttons */
+.wiz-nav { display:flex; gap:1rem; margin-top:2.5rem; align-items:center; }
+.btn-wiz-back { background:none; border:2px solid var(--border); color:var(--text-mid); padding:.875rem 1.75rem; border-radius:11px; font-family:'Outfit',sans-serif; font-weight:700; font-size:14px; cursor:pointer; transition:all .15s; }
+.btn-wiz-back:hover { border-color:var(--navy); color:var(--navy); }
+.btn-wiz-next { background:var(--navy); color:#fff; border:none; padding:.875rem 2rem; border-radius:11px; font-family:'Outfit',sans-serif; font-weight:700; font-size:14px; cursor:pointer; transition:all .15s; }
+.btn-wiz-next:hover { background:#0e2b52; transform:translateY(-1px); box-shadow:0 4px 16px rgba(14,31,61,.3); }
+.btn-wiz-next:disabled { opacity:.5; cursor:not-allowed; transform:none; }
+.wiz-progress { flex:1; height:4px; background:var(--border); border-radius:2px; overflow:hidden; }
+.wiz-progress-fill { height:100%; background:var(--gold); border-radius:2px; transition:width .4s ease; }
+
+/* ── Results ───────────────────────────────────────────────── */
+.match-results { display:none; }
+.results-hero-bar {
+  background:var(--navy); padding:1.75rem 2rem; text-align:center;
+}
+.results-hero-bar h2 { font-family:'Cormorant Garamond',serif; font-size:2.25rem; color:#fff; }
+.results-hero-bar p  { font-size:14px; color:rgba(255,255,255,.5); margin-top:.25rem; }
+
+.results-body { max-width:1100px; margin:0 auto; padding:2rem 2rem 5rem; }
+
+/* AI recommendation card */
+.ai-rec-card {
+  background:linear-gradient(135deg,var(--navy),#16326b);
+  border-radius:16px; padding:1.75rem; margin-bottom:1.75rem;
+  border:1px solid rgba(201,146,42,.2);
+  display:flex; gap:1.25rem; align-items:flex-start;
+}
+.ai-rec-icon {
+  width:48px; height:48px; border-radius:12px; flex-shrink:0;
+  background:linear-gradient(135deg,var(--gold),var(--gold-light));
+  display:flex; align-items:center; justify-content:center;
+  font-size:20px; color:var(--navy);
+}
+.ai-rec-text { font-size:14px; color:rgba(255,255,255,.85); line-height:1.75; flex:1; }
+.ai-rec-text strong { color:var(--gold-light); }
+.ai-rec-loading { display:flex; align-items:center; gap:10px; color:rgba(255,255,255,.5); font-size:14px; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.ai-spin { width:16px; height:16px; border-radius:50%; border:2px solid rgba(255,255,255,.15); border-top-color:var(--gold-light); animation:spin .7s linear infinite; flex-shrink:0; }
+
+/* Match cards grid */
+.match-cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:1.25rem; }
+.match-card {
+  background:#fff; border:1.5px solid var(--border); border-radius:14px;
+  overflow:hidden; transition:all .2s; cursor:pointer;
+  position:relative;
+}
+.match-card:hover { box-shadow:0 8px 32px rgba(0,0,0,.1); transform:translateY(-3px); border-color:rgba(14,31,61,.15); }
+.match-card-top { height:4px; }
+.match-card-top.t1 { background:var(--t1-accent); }
+.match-card-top.t2 { background:var(--t2-accent); }
+.match-card-top.t3 { background:var(--border); }
+.match-score-badge {
+  position:absolute; top:.875rem; right:.875rem;
+  background:var(--navy); color:#fff;
+  font-size:11px; font-weight:800; padding:4px 10px; border-radius:20px;
+  letter-spacing:.04em;
+}
+.match-score-badge.excellent { background:var(--t1-accent); }
+.match-score-badge.good      { background:var(--t2-accent); }
+.match-card-body { padding:1.25rem; }
+.match-card-name { font-family:'Cormorant Garamond',serif; font-size:1.15rem; font-weight:700; color:var(--text); margin-bottom:.2rem; }
+.match-card-loc  { font-size:12px; color:var(--text-muted); margin-bottom:.875rem; display:flex; align-items:center; gap:4px; }
+.match-why { font-size:12.5px; color:var(--text-mid); line-height:1.55; margin-bottom:.875rem; padding:.625rem .75rem; background:var(--cream); border-radius:8px; border-left:3px solid var(--gold); }
+.match-stats { display:grid; grid-template-columns:1fr 1fr; gap:.5rem; }
+.ms-item { text-align:center; background:var(--cream); border-radius:8px; padding:.5rem; }
+.ms-val { font-weight:800; font-size:14px; color:var(--text); }
+.ms-lbl { font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); margin-top:2px; }
+.match-card-actions { padding:1rem 1.25rem; border-top:1px solid var(--border-soft); display:flex; gap:.5rem; }
+.btn-match-view { flex:1; text-align:center; background:var(--navy); color:#fff; text-decoration:none; padding:.625rem; border-radius:8px; font-size:13px; font-weight:700; transition:background .15s; }
+.btn-match-view:hover { background:#0e2b52; }
+.btn-match-cmp { background:var(--cream); border:1.5px solid var(--border); color:var(--text-mid); padding:.625rem .875rem; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; transition:all .15s; }
+.btn-match-cmp:hover { border-color:var(--navy); color:var(--navy); }
+
+.match-retake { text-align:center; margin-top:2rem; }
+.btn-retake { background:none; border:2px solid var(--border); color:var(--text-mid); padding:.75rem 1.75rem; border-radius:11px; font-family:'Outfit',sans-serif; font-weight:700; font-size:14px; cursor:pointer; transition:all .15s; }
+.btn-retake:hover { border-color:var(--navy); color:var(--navy); }
+</style>
+
+<!-- Hero -->
+<section class="match-hero">
+  <div class="match-hero-inner">
+    <div class="hero-eyebrow" style="margin-bottom:.75rem">
+      <span class="hero-eyebrow-dash"></span> University Matching
+      <span class="hero-eyebrow-dash"></span>
+    </div>
+    <h1 class="match-title">Find Your <em>Perfect</em> University</h1>
+    <p class="match-sub">Answer a few questions and our AI will match you with universities that fit your goals, budget, and preferences.</p>
+  </div>
+</section>
+
+<!-- Step progress -->
+<div class="match-steps-bar" style="background:var(--navy)">
+  <div class="match-steps" id="stepNav">
+    <div class="match-step active" id="sn-0"><span class="step-num">1</span> Goals</div>
+    <div class="match-step" id="sn-1"><span class="step-num">2</span> Academics</div>
+    <div class="match-step" id="sn-2"><span class="step-num">3</span> Budget</div>
+    <div class="match-step" id="sn-3"><span class="step-num">4</span> Location</div>
+    <div class="match-step" id="sn-4"><span class="step-num">5</span> Campus Life</div>
+  </div>
+</div>
+
+<!-- Wizard -->
+<div class="match-body" id="wizardBody">
+
+  <!-- Step 0: Goals -->
+  <div class="wiz-step active" id="step-0">
+    <div class="wiz-q">
+      <div class="wiz-q-label">What's your primary goal?</div>
+      <div class="wiz-q-sub">This helps us prioritize what matters most in your matches.</div>
+    </div>
+    <div class="opt-grid">
+      <div class="opt-card" onclick="pick(this,'goal','research')">
+        <span class="opt-icon">🔬</span>
+        <div class="opt-label">Research</div>
+        <div class="opt-sub">PhD, academia, R&D</div>
+      </div>
+      <div class="opt-card" onclick="pick(this,'goal','career')">
+        <span class="opt-icon">💼</span>
+        <div class="opt-label">Career Launch</div>
+        <div class="opt-sub">High earnings, job placement</div>
+      </div>
+      <div class="opt-card" onclick="pick(this,'goal','value')">
+        <span class="opt-icon">💰</span>
+        <div class="opt-label">Best Value</div>
+        <div class="opt-sub">Quality at low cost</div>
+      </div>
+      <div class="opt-card" onclick="pick(this,'goal','prestige')">
+        <span class="opt-icon">🏆</span>
+        <div class="opt-label">Prestige</div>
+        <div class="opt-sub">Rankings, reputation</div>
+      </div>
+      <div class="opt-card" onclick="pick(this,'goal','campus')">
+        <span class="opt-icon">🎉</span>
+        <div class="opt-label">Campus Experience</div>
+        <div class="opt-sub">Community, sports, arts</div>
+      </div>
+      <div class="opt-card" onclick="pick(this,'goal','flexibility')">
+        <span class="opt-icon">🌐</span>
+        <div class="opt-label">Flexibility</div>
+        <div class="opt-sub">Online, transfers, non-trad</div>
+      </div>
+    </div>
+    <div class="wiz-nav">
+      <div class="wiz-progress"><div class="wiz-progress-fill" style="width:0%"></div></div>
+      <button class="btn-wiz-next" onclick="next()" id="btn-0">Continue →</button>
+    </div>
+  </div>
+
+  <!-- Step 1: Academics -->
+  <div class="wiz-step" id="step-1">
+    <div class="wiz-q">
+      <div class="wiz-q-label">What's your field of study?</div>
+      <div class="wiz-q-sub">Select all that interest you.</div>
+    </div>
+    <div class="check-list">
+      <div class="check-item" onclick="toggleCheck(this,'field','stem')">
+        <div class="check-cb">✓</div>
+        <div>
+          <div class="ci-label">STEM — Science, Technology, Engineering, Math</div>
+          <div class="ci-sub">Computer Science, Biology, Engineering, Physics</div>
+        </div>
+      </div>
+      <div class="check-item" onclick="toggleCheck(this,'field','business')">
+        <div class="check-cb">✓</div>
+        <div>
+          <div class="ci-label">Business & Economics</div>
+          <div class="ci-sub">Finance, Marketing, Management, Accounting</div>
+        </div>
+      </div>
+      <div class="check-item" onclick="toggleCheck(this,'field','health')">
+        <div class="check-cb">✓</div>
+        <div>
+          <div class="ci-label">Health & Medicine</div>
+          <div class="ci-sub">Pre-Med, Nursing, Public Health, Pharmacy</div>
+        </div>
+      </div>
+      <div class="check-item" onclick="toggleCheck(this,'field','arts')">
+        <div class="check-cb">✓</div>
+        <div>
+          <div class="ci-label">Arts, Humanities & Social Sciences</div>
+          <div class="ci-sub">Psychology, History, English, Political Science</div>
+        </div>
+      </div>
+      <div class="check-item" onclick="toggleCheck(this,'field','education')">
+        <div class="check-cb">✓</div>
+        <div>
+          <div class="ci-label">Education & Law</div>
+          <div class="ci-sub">Teaching, Pre-Law, Public Policy</div>
+        </div>
+      </div>
+    </div>
+    <div class="wiz-q" style="margin-top:1.75rem">
+      <div class="wiz-q-label" style="font-size:1.35rem">What's your approximate GPA?</div>
+    </div>
+    <div class="range-group">
+      <div class="range-row">
+        <div class="range-lbl">GPA <span id="gpaVal">3.5</span></div>
+        <input type="range" id="gpaRange" min="2.0" max="4.0" step="0.1" value="3.5"
+               oninput="updateRange('gpaVal',this,v=>(+v).toFixed(1))">
+      </div>
+    </div>
+    <div class="wiz-nav">
+      <button class="btn-wiz-back" onclick="prev()">← Back</button>
+      <div class="wiz-progress"><div class="wiz-progress-fill" style="width:25%"></div></div>
+      <button class="btn-wiz-next" onclick="next()">Continue →</button>
+    </div>
+  </div>
+
+  <!-- Step 2: Budget -->
+  <div class="wiz-step" id="step-2">
+    <div class="wiz-q">
+      <div class="wiz-q-label">What's your annual budget for tuition?</div>
+      <div class="wiz-q-sub">We'll filter to universities within your range.</div>
+    </div>
+    <div class="opt-grid" style="grid-template-columns:repeat(auto-fill,minmax(155px,1fr))">
+      <div class="opt-card" onclick="pick(this,'budget','under10k')">
+        <span class="opt-icon">🟢</span>
+        <div class="opt-label">Under $10K</div>
+        <div class="opt-sub">In-state / community</div>
+      </div>
+      <div class="opt-card" onclick="pick(this,'budget','10-20k')">
+        <span class="opt-icon">🟡</span>
+        <div class="opt-label">$10K – $20K</div>
+        <div class="opt-sub">Public universities</div>
+      </div>
+      <div class="opt-card" onclick="pick(this,'budget','20-40k')">
+        <span class="opt-icon">🟠</span>
+        <div class="opt-label">$20K – $40K</div>
+        <div class="opt-sub">Mid-range private</div>
+      </div>
+      <div class="opt-card" onclick="pick(this,'budget','40k+')">
+        <span class="opt-icon">🔴</span>
+        <div class="opt-label">$40K+</div>
+        <div class="opt-sub">Elite private</div>
+      </div>
+      <div class="opt-card" onclick="pick(this,'budget','any')">
+        <span class="opt-icon">🌈</span>
+        <div class="opt-label">No Limit</div>
+        <div class="opt-sub">Show all options</div>
+      </div>
+    </div>
+    <div class="wiz-q" style="margin-top:1.75rem">
+      <div class="wiz-q-label" style="font-size:1.35rem">How important is financial aid?</div>
+    </div>
+    <div class="range-group">
+      <div class="range-row">
+        <div class="range-lbl">Importance <span id="aidVal">High</span></div>
+        <input type="range" id="aidRange" min="1" max="3" step="1" value="2"
+               oninput="updateRange('aidVal',this,v=>['Low','Medium','High'][+v-1])">
+      </div>
+    </div>
+    <div class="wiz-nav">
+      <button class="btn-wiz-back" onclick="prev()">← Back</button>
+      <div class="wiz-progress"><div class="wiz-progress-fill" style="width:50%"></div></div>
+      <button class="btn-wiz-next" onclick="next()">Continue →</button>
+    </div>
+  </div>
+
+  <!-- Step 3: Location -->
+  <div class="wiz-step" id="step-3">
+    <div class="wiz-q">
+      <div class="wiz-q-label">Any preferred states or regions?</div>
+      <div class="wiz-q-sub">Leave blank to consider all 50 states.</div>
+    </div>
+    <input type="text" class="wiz-input" id="stateInput" placeholder="e.g. Texas, California, New York… (optional)">
+    <div class="wiz-q" style="margin-top:1.75rem">
+      <div class="wiz-q-label" style="font-size:1.35rem">What size of university do you prefer?</div>
+    </div>
+    <div class="opt-grid" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr))">
+      <div class="opt-card" onclick="pick(this,'size','small')">
+        <span class="opt-icon">🏡</span>
+        <div class="opt-label">Small</div>
+        <div class="opt-sub">Under 5,000 students</div>
+      </div>
+      <div class="opt-card" onclick="pick(this,'size','medium')">
+        <span class="opt-icon">🏢</span>
+        <div class="opt-label">Medium</div>
+        <div class="opt-sub">5K – 20K students</div>
+      </div>
+      <div class="opt-card" onclick="pick(this,'size','large')">
+        <span class="opt-icon">🏙️</span>
+        <div class="opt-label">Large</div>
+        <div class="opt-sub">20K – 50K students</div>
+      </div>
+      <div class="opt-card" onclick="pick(this,'size','any')">
+        <span class="opt-icon">🌍</span>
+        <div class="opt-label">Any Size</div>
+        <div class="opt-sub">No preference</div>
+      </div>
+    </div>
+    <div class="wiz-nav">
+      <button class="btn-wiz-back" onclick="prev()">← Back</button>
+      <div class="wiz-progress"><div class="wiz-progress-fill" style="width:75%"></div></div>
+      <button class="btn-wiz-next" onclick="next()">Continue →</button>
+    </div>
+  </div>
+
+  <!-- Step 4: Campus Life -->
+  <div class="wiz-step" id="step-4">
+    <div class="wiz-q">
+      <div class="wiz-q-label">What matters to you on campus?</div>
+      <div class="wiz-q-sub">Select everything that applies.</div>
+    </div>
+    <div class="check-list">
+      <div class="check-item" onclick="toggleCheck(this,'vibe','research_focus')">
+        <div class="check-cb">✓</div><div><div class="ci-label">Research Opportunities</div><div class="ci-sub">Labs, grants, faculty mentorship</div></div>
+      </div>
+      <div class="check-item" onclick="toggleCheck(this,'vibe','internships')">
+        <div class="check-cb">✓</div><div><div class="ci-label">Strong Internship / Career Network</div><div class="ci-sub">Industry ties, career fairs, alumni</div></div>
+      </div>
+      <div class="check-item" onclick="toggleCheck(this,'vibe','diversity')">
+        <div class="check-cb">✓</div><div><div class="ci-label">Diverse & Inclusive Community</div><div class="ci-sub">HBCU, HSI, international students</div></div>
+      </div>
+      <div class="check-item" onclick="toggleCheck(this,'vibe','sports')">
+        <div class="check-cb">✓</div><div><div class="ci-label">Sports & Recreation</div><div class="ci-sub">D1 athletics, gym, outdoor activities</div></div>
+      </div>
+      <div class="check-item" onclick="toggleCheck(this,'vibe','arts_culture')">
+        <div class="check-cb">✓</div><div><div class="ci-label">Arts, Culture & Greek Life</div><div class="ci-sub">Theater, music, fraternities/sororities</div></div>
+      </div>
+    </div>
+    <div class="wiz-q" style="margin-top:1.75rem">
+      <div class="wiz-q-label" style="font-size:1.35rem">Anything else? <span style="font-weight:400;color:var(--text-muted);font-size:1rem">(optional)</span></div>
+    </div>
+    <textarea class="wiz-input" id="extraInput" rows="3" placeholder="e.g. 'I want a school near the ocean' or 'I'm interested in cybersecurity'…"></textarea>
+    <div class="wiz-nav">
+      <button class="btn-wiz-back" onclick="prev()">← Back</button>
+      <div class="wiz-progress"><div class="wiz-progress-fill" style="width:100%"></div></div>
+      <button class="btn-wiz-next" onclick="runMatch()" id="btn-4">✦ Find My Matches</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- Results section -->
+<div class="match-results" id="matchResults">
+  <div class="results-hero-bar">
+    <h2 id="resultsTitle">Your University Matches</h2>
+    <p id="resultsSub">Based on your preferences</p>
+  </div>
+  <div class="results-body">
+    <div class="ai-rec-card" id="aiRecCard">
+      <div class="ai-rec-icon">✦</div>
+      <div class="ai-rec-text">
+        <div class="ai-rec-loading"><div class="ai-spin"></div> Claude is analyzing your preferences and finding your best matches…</div>
+      </div>
+    </div>
+    <div class="match-cards" id="matchCards"></div>
+    <div class="match-retake">
+      <button class="btn-retake" onclick="retake()">← Retake Quiz</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentStep = 0;
+const TOTAL = 5;
+const answers = {};
+
+// ── Single-select pick ──────────────────────────────────────
+function pick(el, key, val) {
+  el.closest('.opt-grid').querySelectorAll('.opt-card').forEach(c => c.classList.remove('sel'));
+  el.classList.add('sel');
+  answers[key] = val;
+}
+
+// ── Multi-select toggle ─────────────────────────────────────
+function toggleCheck(el, key, val) {
+  el.classList.toggle('sel');
+  if (!answers[key]) answers[key] = [];
+  const i = answers[key].indexOf(val);
+  if (el.classList.contains('sel')) { if (i===-1) answers[key].push(val); }
+  else { if (i>-1) answers[key].splice(i,1); }
+}
+
+// ── Sliders ─────────────────────────────────────────────────
+function updateRange(spanId, el, fmt) {
+  document.getElementById(spanId).textContent = fmt(el.value);
+  const pct = ((el.value - el.min) / (el.max - el.min)) * 100;
+  el.style.setProperty('--pct', pct + '%');
+}
+
+// ── Navigation ──────────────────────────────────────────────
+function next() {
+  if (currentStep < TOTAL-1) {
+    document.getElementById('step-'+currentStep).classList.remove('active');
+    document.getElementById('sn-'+currentStep).classList.remove('active');
+    document.getElementById('sn-'+currentStep).classList.add('done');
+    currentStep++;
+    document.getElementById('step-'+currentStep).classList.add('active');
+    document.getElementById('sn-'+currentStep).classList.add('active');
+  }
+}
+function prev() {
+  if (currentStep > 0) {
+    document.getElementById('step-'+currentStep).classList.remove('active');
+    document.getElementById('sn-'+currentStep).classList.remove('active');
+    currentStep--;
+    document.getElementById('step-'+currentStep).classList.add('active');
+    document.getElementById('sn-'+currentStep).classList.remove('done');
+    document.getElementById('sn-'+currentStep).classList.add('active');
+  }
+}
+
+function retake() {
+  document.getElementById('matchResults').style.display  = 'none';
+  document.getElementById('wizardBody').style.display    = 'block';
+  document.querySelectorAll('.match-hero,.match-steps-bar').forEach(el=>el.style.display='');
+  currentStep = 0;
+  document.querySelectorAll('.wiz-step').forEach(el=>el.classList.remove('active'));
+  document.getElementById('step-0').classList.add('active');
+  document.querySelectorAll('.match-step').forEach((el,i)=>{ el.classList.remove('active','done'); if(i===0) el.classList.add('active'); });
+}
+
+// ── Run matching ─────────────────────────────────────────────
+async function runMatch() {
+  document.getElementById('wizardBody').style.display    = 'none';
+  document.querySelector('.match-hero').style.display    = 'none';
+  document.querySelector('.match-steps-bar').style.display = 'none';
+  const resultsEl = document.getElementById('matchResults');
+  resultsEl.style.display = 'block';
+
+  // Build preference string
+  answers.gpa   = document.getElementById('gpaRange').value;
+  answers.extra = document.getElementById('extraInput').value.trim();
+  answers.state = document.getElementById('stateInput').value.trim();
+
+  // Collect all unis from DB
+  const r = await fetch('/api/universities/all');
+  let all = await r.json();
+
+  // ── Client-side hard filters ──────────────────────────────
+  // Budget filter
+  const budgetMax = { 'under10k':10000, '10-20k':20000, '20-40k':40000, '40k+':Infinity, 'any':Infinity };
+  const maxTuition = budgetMax[answers.budget] || Infinity;
+  if (maxTuition < Infinity) {
+    all = all.filter(u => !u.in_state_tuition || u.in_state_tuition <= maxTuition);
+  }
+  // State filter
+  if (answers.state) {
+    const stateU = answers.state.toUpperCase().split(/[, ]+/).map(s=>s.trim()).filter(Boolean);
+    const stateMap = {"ALABAMA":"AL","ALASKA":"AK","ARIZONA":"AZ","ARKANSAS":"AR","CALIFORNIA":"CA","COLORADO":"CO","CONNECTICUT":"CT","DELAWARE":"DE","FLORIDA":"FL","GEORGIA":"GA","HAWAII":"HI","IDAHO":"ID","ILLINOIS":"IL","INDIANA":"IN","IOWA":"IA","KANSAS":"KS","KENTUCKY":"KY","LOUISIANA":"LA","MAINE":"ME","MARYLAND":"MD","MASSACHUSETTS":"MA","MICHIGAN":"MI","MINNESOTA":"MN","MISSISSIPPI":"MS","MISSOURI":"MO","MONTANA":"MT","NEBRASKA":"NE","NEVADA":"NV","NEW HAMPSHIRE":"NH","NEW JERSEY":"NJ","NEW MEXICO":"NM","NEW YORK":"NY","NORTH CAROLINA":"NC","NORTH DAKOTA":"ND","OHIO":"OH","OKLAHOMA":"OK","OREGON":"OR","PENNSYLVANIA":"PA","RHODE ISLAND":"RI","SOUTH CAROLINA":"SC","SOUTH DAKOTA":"SD","TENNESSEE":"TN","TEXAS":"TX","UTAH":"UT","VERMONT":"VT","VIRGINIA":"VA","WASHINGTON":"WA","WEST VIRGINIA":"WV","WISCONSIN":"WI","WYOMING":"WY"};
+    const abbrs = stateU.map(s => stateMap[s] || s);
+    all = all.filter(u => abbrs.some(a => u.state?.toUpperCase() === a.toUpperCase()));
+  }
+  // Size filter
+  const sizeBounds = { small:[0,5000], medium:[5000,20000], large:[20000,50000], any:[0,Infinity] };
+  if (answers.size && answers.size !== 'any') {
+    const [mn,mx] = sizeBounds[answers.size]||[0,Infinity];
+    all = all.filter(u => !u.student_size || (u.student_size >= mn && u.student_size <= mx));
+  }
+
+  // ── Score each university ─────────────────────────────────
+  function score(u) {
+    let s = 50;
+    const goal = answers.goal;
+    if (goal==='research') { if(u.tier==='T1') s+=30; else if(u.tier==='T2') s+=15; }
+    if (goal==='career')   { if(u.median_earnings>60000) s+=25; if(u.median_earnings>80000) s+=15; }
+    if (goal==='value')    { if(u.in_state_tuition && u.in_state_tuition<15000) s+=25; if(u.median_earnings>50000) s+=15; }
+    if (goal==='prestige') { if(u.tier==='T1') s+=35; }
+    if (goal==='campus')   { if(u.student_size>15000) s+=20; }
+    if (u.acceptance_rate && u.acceptance_rate > 40 && u.acceptance_rate < 85) s+=10;
+    return Math.min(s, 99);
+  }
+
+  all.sort((a,b) => score(b)-score(a));
+  const top = all.slice(0,12);
+
+  document.getElementById('resultsTitle').textContent = `Your Top ${top.length} University Matches`;
+  document.getElementById('resultsSub').textContent   = `Personalized for your goals · ${all.length.toLocaleString()} universities evaluated`;
+
+  // ── Render match cards ────────────────────────────────────
+  const cards = document.getElementById('matchCards');
+  cards.innerHTML = top.map((u,i) => {
+    const sc = score(u);
+    const scoreLabel = sc>=80?'Excellent Match':sc>=65?'Great Match':'Good Match';
+    const scoreCls   = sc>=80?'excellent':sc>=65?'good':'';
+    const tierC = u.tier==='T1'?'t1':u.tier==='T2'?'t2':'t3';
+    const acc   = u.acceptance_rate ? (u.acceptance_rate>1?Math.round(u.acceptance_rate):Math.round(u.acceptance_rate*100))+'%' : '—';
+    const tuit  = u.in_state_tuition ? '$'+Number(u.in_state_tuition).toLocaleString() : '—';
+    const earn  = u.median_earnings  ? '$'+Number(u.median_earnings).toLocaleString()  : '—';
+    const why   = buildWhy(u, answers);
+    return `
+    <div class="match-card" onclick="window.location='/university/${u.id}'">
+      <div class="match-card-top ${tierC}"></div>
+      <span class="match-score-badge ${scoreCls}">${scoreLabel}</span>
+      <div class="match-card-body">
+        <div class="match-card-name">${u.name}</div>
+        <div class="match-card-loc">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 1 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          ${[u.city,u.state].filter(Boolean).join(', ')}
+        </div>
+        <div class="match-why">${why}</div>
+        <div class="match-stats">
+          <div class="ms-item"><div class="ms-val">${acc}</div><div class="ms-lbl">Acceptance</div></div>
+          <div class="ms-item"><div class="ms-val">${tuit}</div><div class="ms-lbl">In-State</div></div>
+          <div class="ms-item"><div class="ms-val">${earn}</div><div class="ms-lbl">Earnings</div></div>
+          <div class="ms-item"><div class="ms-val">${u.tier||'T3'}</div><div class="ms-lbl">Carnegie</div></div>
+        </div>
+      </div>
+      <div class="match-card-actions" onclick="event.stopPropagation()">
+        <a href="/university/${u.id}" class="btn-match-view">View Profile →</a>
+        <button class="btn-match-cmp" onclick="addToCompare(${u.id})">+ Compare</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  // ── AI Recommendation ─────────────────────────────────────
+  const topNames = top.slice(0,5).map(u=>u.name).join(', ');
+  const prefs = `Goal: ${answers.goal||'general'} | Budget: ${answers.budget||'any'} | Size: ${answers.size||'any'} | Fields: ${(answers.field||[]).join(', ')||'any'} | State pref: ${answers.state||'none'} | GPA: ${answers.gpa||'3.5'} | Campus priorities: ${(answers.vibe||[]).join(', ')||'general'}. ${answers.extra||''}`;
+  try {
+    const aiR = await fetch('/api/match_ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        preferences: prefs,
+        top_names: topNames
+      })
+    });
+
+    const aiD = await aiR.json();
+    if (!aiR.ok || aiD.error) throw new Error(aiD.error || 'Server error');
+
+    document.getElementById('aiRecCard').querySelector('.ai-rec-text').innerHTML =
+      `<div style="font-size:12px;color:rgba(255,255,255,.4);font-weight:700;letter-spacing:.07em;text-transform:uppercase;margin-bottom:.75rem">✦ Personalized Analysis (Powered by Groq)</div>${aiD.result}`;
+  } catch(e) {
+    document.getElementById('aiRecCard').querySelector('.ai-rec-text').innerHTML =
+      `<div style="font-size:12px;color:rgba(255,255,255,.4);font-weight:700;letter-spacing:.07em;text-transform:uppercase;margin-bottom:.75rem">✦ Personalized Analysis (Powered by Groq)</div><div style="color:rgba(255,255,255,.75)">AI recommendation unavailable: ${e.message}</div>`;
+  }
+}
+
+function buildWhy(u, a) {
+  const parts = [];
+  if (a.goal==='research' && u.tier==='T1') parts.push('R1 research university');
+  if (a.goal==='career' && u.median_earnings>60000) parts.push(`strong career outcomes ($${Math.round(u.median_earnings/1000)}K median earnings)`);
+  if (a.goal==='value' && u.in_state_tuition && u.in_state_tuition<15000) parts.push(`excellent value at $${Number(u.in_state_tuition).toLocaleString()} in-state`);
+  if (u.tier==='T1') parts.push('top research classification');
+  if (!parts.length) parts.push(`matches your ${a.goal||'academic'} goals`);
+  return `Matches because: ${parts.slice(0,2).join(' · ')}`;
+}
+
+function addToCompare(id) {
+  let ids = JSON.parse(localStorage.getItem('compareIds')||'[]');
+  if (!ids.includes(id) && ids.length<4) { ids.push(id); localStorage.setItem('compareIds',JSON.stringify(ids)); }
+  window.location.href = '/compare';
+}
+
+// init sliders
+updateRange('gpaVal',document.getElementById('gpaRange'),v=>(+v).toFixed(1));
+updateRange('aidVal',document.getElementById('aidRange'),v=>['Low','Medium','High'][+v-1]);
+</script>
+{% endblock %}

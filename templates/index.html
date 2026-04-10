@@ -1,0 +1,302 @@
+{% extends "base.html" %}
+{% block title %}UniSearch — Find Your University{% endblock %}
+{% block body %}
+
+<!-- Hero -->
+<section class="hero">
+  <div class="hero-mesh"></div>
+  <div class="hero-eyebrow">
+    <span class="hero-eyebrow-dash"></span>
+    University Research Platform
+    <span class="hero-eyebrow-dash"></span>
+  </div>
+  <h1 class="hero-title">Find the <em>right</em> university<br>for your future</h1>
+  <p class="hero-sub">Search 6,000+ accredited US institutions with verified data, Carnegie classifications, and per-fact source links.</p>
+
+  <div class="search-wrap">
+    <div class="search-row">
+      <input class="search-input" type="text" id="heroSearch"
+             placeholder="Search by name, city, or state…"
+             value="{{ request.args.get('q','') }}"
+             autocomplete="off">
+      <button class="search-submit" onclick="applyFilters()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        Search
+      </button>
+    </div>
+  </div>
+
+  <div class="hero-stats" id="heroStats">
+    <div class="hero-stat">
+      <div class="hero-stat-num" id="statTotal">—</div>
+      <div class="hero-stat-lbl">Institutions</div>
+    </div>
+    <div class="hero-sep"></div>
+    <div class="hero-stat">
+      <div class="hero-stat-num" id="statT1">—</div>
+      <div class="hero-stat-lbl">R1 Research (T1)</div>
+    </div>
+    <div class="hero-sep"></div>
+    <div class="hero-stat">
+      <div class="hero-stat-num" id="statT2">—</div>
+      <div class="hero-stat-lbl">R2 Research (T2)</div>
+    </div>
+    <div class="hero-sep"></div>
+    <div class="hero-stat">
+      <div class="hero-stat-num" id="statStates">50</div>
+      <div class="hero-stat-lbl">States</div>
+    </div>
+  </div>
+</section>
+
+<!-- Filters -->
+<div class="filters-bar">
+  <div class="filters-inner">
+    <span class="filter-label">Filter</span>
+
+    <select class="filter-sel" id="fState" onchange="applyFilters()">
+      <option value="">All States</option>
+      {% for s in states %}
+      <option value="{{ s }}" {% if request.args.get('state')==s %}selected{% endif %}>{{ s }}</option>
+      {% endfor %}
+    </select>
+
+    <select class="filter-sel" id="fTier" onchange="applyFilters()">
+      <option value="">All Tiers</option>
+      <option value="T1" {% if request.args.get('tier')=='T1' %}selected{% endif %}>T1 — R1 Research</option>
+      <option value="T2" {% if request.args.get('tier')=='T2' %}selected{% endif %}>T2 — R2 Research</option>
+      <option value="T3" {% if request.args.get('tier')=='T3' %}selected{% endif %}>T3 — Other</option>
+    </select>
+
+    <select class="filter-sel" id="fControl" onchange="applyFilters()">
+      <option value="">Public & Private</option>
+      <option value="Public">Public</option>
+      <option value="Private">Private</option>
+    </select>
+
+    <span class="filter-sep"></span>
+
+    <span style="font-size:12px;color:var(--text-muted);font-weight:500;">Tuition</span>
+    <input class="filter-num" type="number" id="fTuitionMin" placeholder="Min $" oninput="applyFilters()">
+    <span style="font-size:11px;color:var(--text-muted)">–</span>
+    <input class="filter-num" type="number" id="fTuitionMax" placeholder="Max $" oninput="applyFilters()">
+
+    <span class="filter-sep"></span>
+    <button class="filter-clear" onclick="clearFilters()">✕ Clear</button>
+    <span class="count-badge" id="countBadge">Loading…</span>
+  </div>
+</div>
+
+<!-- Sort + view -->
+<div class="list-header">
+  <span class="sort-label">Sort</span>
+  <button class="sort-btn active" id="sortName" onclick="setSort('name',this)">Name A–Z</button>
+  <button class="sort-btn" id="sortTier" onclick="setSort('tier',this)">Tier</button>
+  <button class="sort-btn" id="sortEarnings" onclick="setSort('earnings',this)">Earnings</button>
+  <button class="sort-btn" id="sortSize" onclick="setSort('size',this)">Enrollment</button>
+  <div class="view-btns" style="margin-left:auto">
+    <button class="view-btn active" id="viewGrid" title="Grid" onclick="setView('grid',this)">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    </button>
+    <button class="view-btn" id="viewList" title="List" onclick="setView('list',this)">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- Cards -->
+<div class="cards-section">
+  <div class="cards-grid" id="cardsGrid"></div>
+  <div class="load-more-row" id="loadMoreRow" style="display:none">
+    <button class="btn-load" onclick="loadMore()">Load more universities</button>
+  </div>
+</div>
+
+<script>
+// ── State & data ─────────────────────────────────────────────
+let allUniversities = [];
+let filtered = [];
+let displayCount = 24;
+let sortKey = 'name';
+
+// ── Fetch ─────────────────────────────────────────────────────
+async function boot() {
+  document.getElementById('countBadge').textContent = 'Loading…';
+  try {
+    const res = await fetch('/api/universities/all');
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
+    allUniversities = data;
+
+    document.getElementById('statTotal').textContent = allUniversities.length.toLocaleString();
+    document.getElementById('statT1').textContent = allUniversities.filter(u=>u.tier==='T1').length;
+    document.getElementById('statT2').textContent = allUniversities.filter(u=>u.tier==='T2').length;
+    applyFilters();
+  } catch(err) {
+    console.error('Boot error:', err);
+    document.getElementById('countBadge').textContent = 'Error';
+    document.getElementById('cardsGrid').innerHTML = `
+      <div class="no-results">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <p>Could not load universities.</p>
+        <p style="font-size:12px;margin-top:.5rem;color:var(--text-muted);font-family:monospace;word-break:break-all">${err.message}</p>
+        <p style="font-size:12px;margin-top:.5rem;color:var(--text-muted)">Check the server terminal for the full traceback, then restart Flask.</p>
+      </div>`;
+  }
+}
+boot();
+
+// ── Filter + sort ─────────────────────────────────────────────
+function applyFilters() {
+  const q       = document.getElementById('heroSearch').value.trim().toLowerCase();
+  const state   = document.getElementById('fState').value;
+  const tier    = document.getElementById('fTier').value;
+  const control = document.getElementById('fControl').value;
+  const tMin    = parseFloat(document.getElementById('fTuitionMin').value) || 0;
+  const tMax    = parseFloat(document.getElementById('fTuitionMax').value) || Infinity;
+
+  filtered = allUniversities.filter(u => {
+    if (q && !u.name.toLowerCase().includes(q)
+           && !(u.city||'').toLowerCase().includes(q)
+           && !(u.state||'').toLowerCase().includes(q)) return false;
+    if (state   && u.state !== state) return false;
+    if (tier    && u.tier  !== tier)  return false;
+    if (control === 'Public'  && !(u.control||'').includes('Public'))  return false;
+    if (control === 'Private' && !(u.control||'').includes('Private')) return false;
+    if (u.in_state_tuition) {
+      if (u.in_state_tuition < tMin || u.in_state_tuition > tMax) return false;
+    }
+    return true;
+  });
+
+  // Sort
+  filtered.sort((a,b) => {
+    if (sortKey === 'tier') {
+      const order = {T1:0,T2:1,T3:2};
+      return (order[a.tier]||2) - (order[b.tier]||2) || a.name.localeCompare(b.name);
+    }
+    if (sortKey === 'earnings') return (b.median_earnings||0) - (a.median_earnings||0);
+    if (sortKey === 'size') return (b.student_size||0) - (a.student_size||0);
+    return a.name.localeCompare(b.name);
+  });
+
+  displayCount = 24;
+  document.getElementById('countBadge').textContent = filtered.length.toLocaleString() + ' universities';
+  renderCards();
+}
+
+function setSort(key, btn) {
+  sortKey = key;
+  document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  applyFilters();
+}
+
+function clearFilters() {
+  document.getElementById('heroSearch').value = '';
+  document.getElementById('fState').value = '';
+  document.getElementById('fTier').value = '';
+  document.getElementById('fControl').value = '';
+  document.getElementById('fTuitionMin').value = '';
+  document.getElementById('fTuitionMax').value = '';
+  applyFilters();
+}
+
+// ── Render cards ──────────────────────────────────────────────
+function tierTag(tier) {
+  if (!tier) return '';
+  const map = {T1:'t1',T2:'t2',T3:'t3'};
+  const lbl = {T1:'T1 · R1',T2:'T2 · R2',T3:'T3'};
+  return `<span class="tier-tag ${map[tier]||'t3'}"><span class="dot"></span>${lbl[tier]||tier}</span>`;
+}
+function fmt(n, prefix='') {
+  if (!n) return '—';
+  if (n >= 1000000) return prefix+(n/1000000).toFixed(1)+'M';
+  if (n >= 1000) return prefix+(n/1000).toFixed(0)+'K';
+  return prefix+n.toLocaleString();
+}
+function fmtDollar(n) {
+  if (!n) return '—';
+  return '$'+n.toLocaleString();
+}
+function cardHTML(u) {
+  const tier = (u.tier||'T3').toLowerCase();
+  const domain = (u.school_url||'').replace(/^https?:\/\//,'').replace(/\/$/,'');
+  return `
+  <a class="uni-card ${tier} fade-up" href="/university/${u.id}">
+    <div class="uni-card-accent"></div>
+    <div class="card-head">
+      <div>
+        <div class="card-name">${u.name}</div>
+        <div class="card-loc">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 1 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          ${[u.city,u.state].filter(Boolean).join(', ')||'—'}
+        </div>
+      </div>
+      ${tierTag(u.tier)}
+    </div>
+    <div class="card-stats">
+      <div class="card-stat">
+        <div class="card-stat-val">${u.acceptance_rate ? (u.acceptance_rate > 1 ? Math.round(u.acceptance_rate) : Math.round(u.acceptance_rate*100))+"%"  : "—"}</div>
+        <div class="card-stat-lbl">Acceptance</div>
+      </div>
+      <div class="card-stat">
+        <div class="card-stat-val">${fmtDollar(u.in_state_tuition)}</div>
+        <div class="card-stat-lbl">In-State Tuition</div>
+      </div>
+      <div class="card-stat">
+        <div class="card-stat-val">${fmt(u.student_size)}</div>
+        <div class="card-stat-lbl">Students</div>
+      </div>
+      <div class="card-stat">
+        <div class="card-stat-val">${fmtDollar(u.median_earnings)}</div>
+        <div class="card-stat-lbl">Med. Earnings</div>
+      </div>
+    </div>
+    <div class="card-foot">
+      <span class="card-domain">${domain||'No website'}</span>
+      <div class="card-arrow">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+    </div>
+  </a>`;
+}
+
+function renderCards() {
+  const grid = document.getElementById('cardsGrid');
+  const slice = filtered.slice(0, displayCount);
+  if (slice.length === 0) {
+    grid.innerHTML = `<div class="no-results">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <p>No universities match your filters.</p>
+    </div>`;
+  } else {
+    grid.innerHTML = slice.map(cardHTML).join('');
+  }
+  const more = document.getElementById('loadMoreRow');
+  more.style.display = filtered.length > displayCount ? 'block' : 'none';
+}
+
+function loadMore() {
+  displayCount += 24;
+  renderCards();
+}
+
+// ── View toggle ───────────────────────────────────────────────
+function setView(v, btn) {
+  document.querySelectorAll('.view-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  const grid = document.getElementById('cardsGrid');
+  if (v === 'list') {
+    grid.style.gridTemplateColumns = '1fr';
+  } else {
+    grid.style.gridTemplateColumns = '';
+  }
+}
+
+// Enter key
+document.getElementById('heroSearch').addEventListener('keydown', e => {
+  if (e.key === 'Enter') applyFilters();
+});
+</script>
+{% endblock %}

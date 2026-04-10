@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% block title %}{{ state_name }} Universities — UniSearch{% endblock %}
+{% block body %}
+
+<!-- Hero -->
+<section class="state-hero">
+  <div class="state-hero-bg-letter">{{ state_abbr }}</div>
+  <div class="state-hero-inner">
+    <div class="breadcrumb">
+      <a href="/">Home</a>
+      <span class="breadcrumb-sep">›</span>
+      <a href="/map">Map</a>
+      <span class="breadcrumb-sep">›</span>
+      <span>{{ state_name }}</span>
+    </div>
+    <h1 class="state-hero-title">{{ state_name }}</h1>
+    <div class="state-hero-stats">
+      <div>
+        <div class="state-hero-num" id="statTotal">—</div>
+        <div class="state-hero-lbl">Universities</div>
+      </div>
+      <div>
+        <div class="state-hero-num" id="statT1" style="color:#6ee7b7">—</div>
+        <div class="state-hero-lbl">R1 (T1)</div>
+      </div>
+      <div>
+        <div class="state-hero-num" id="statT2" style="color:#fdba74">—</div>
+        <div class="state-hero-lbl">R2 (T2)</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;" id="tierPills"></div>
+  </div>
+</section>
+
+<!-- Filters row -->
+<div class="filters-bar">
+  <div class="filters-inner">
+    <span class="filter-label">Filter</span>
+    <input class="filter-num" type="text" id="fSearch"
+           placeholder="Search name…" oninput="applyFilters()"
+           style="width:220px">
+    <select class="filter-sel" id="fTier" onchange="applyFilters()">
+      <option value="">All Tiers</option>
+      <option value="T1">T1 — R1 Research</option>
+      <option value="T2">T2 — R2 Research</option>
+      <option value="T3">T3 — Other</option>
+    </select>
+    <select class="filter-sel" id="fSort" onchange="applyFilters()">
+      <option value="name">Name A–Z</option>
+      <option value="tier">Tier</option>
+      <option value="earnings">Earnings ↓</option>
+      <option value="size">Enrollment ↓</option>
+    </select>
+    <button class="filter-clear" onclick="clearF()">✕ Clear</button>
+    <span class="count-badge" id="countBadge">Loading…</span>
+  </div>
+</div>
+
+<!-- Mini map + list layout -->
+<div style="max-width:1360px;margin:2rem auto;padding:0 2rem;display:grid;grid-template-columns:1fr;gap:1.5rem;">
+  <div class="cards-grid" id="cardsGrid"></div>
+  <div class="load-more-row" id="loadMoreRow" style="display:none">
+    <button class="btn-load" onclick="loadMore()">Load more</button>
+  </div>
+</div>
+
+<script>
+const STATE_ABBR = '{{ state_abbr }}';
+let all = [], filtered = [], displayCount = 30;
+
+async function boot() {
+  const res = await fetch('/api/universities/all?state=' + STATE_ABBR);
+  all = await res.json();
+  document.getElementById('statTotal').textContent = all.length;
+  document.getElementById('statT1').textContent = all.filter(u=>u.tier==='T1').length;
+  document.getElementById('statT2').textContent = all.filter(u=>u.tier==='T2').length;
+  const pills = document.getElementById('tierPills');
+  const t1 = all.filter(u=>u.tier==='T1').length;
+  const t2 = all.filter(u=>u.tier==='T2').length;
+  if (t1) pills.innerHTML += `<span class="tier-tag t1"><span class="dot"></span>${t1} R1 universities</span>`;
+  if (t2) pills.innerHTML += `<span class="tier-tag t2"><span class="dot"></span>${t2} R2 universities</span>`;
+  applyFilters();
+}
+boot();
+
+function applyFilters() {
+  const q    = (document.getElementById('fSearch').value||'').toLowerCase();
+  const tier = document.getElementById('fTier').value;
+  const sort = document.getElementById('fSort').value;
+  filtered = all.filter(u => {
+    if (q && !u.name.toLowerCase().includes(q)) return false;
+    if (tier && u.tier !== tier) return false;
+    return true;
+  });
+  filtered.sort((a,b) => {
+    if (sort==='tier') { const o={T1:0,T2:1,T3:2}; return (o[a.tier]||2)-(o[b.tier]||2)||a.name.localeCompare(b.name); }
+    if (sort==='earnings') return (b.median_earnings||0)-(a.median_earnings||0);
+    if (sort==='size') return (b.student_size||0)-(a.student_size||0);
+    return a.name.localeCompare(b.name);
+  });
+  displayCount = 30;
+  document.getElementById('countBadge').textContent = filtered.length + ' universities';
+  renderCards();
+}
+
+function clearF() {
+  document.getElementById('fSearch').value='';
+  document.getElementById('fTier').value='';
+  applyFilters();
+}
+
+function loadMore() { displayCount+=30; renderCards(); }
+
+function tierTag(tier) {
+  if (!tier) return '';
+  const c={T1:'t1',T2:'t2',T3:'t3'}, l={T1:'T1·R1',T2:'T2·R2',T3:'T3'};
+  return `<span class="tier-tag ${c[tier]||'t3'}"><span class="dot"></span>${l[tier]||tier}</span>`;
+}
+function fmtD(n) { return n?'$'+n.toLocaleString():'—'; }
+function fmt(n) {
+  if(!n) return '—';
+  return n>=1000?Math.round(n/1000)+'K':n.toLocaleString();
+}
+
+function renderCards() {
+  const grid = document.getElementById('cardsGrid');
+  const slice = filtered.slice(0, displayCount);
+  if (!slice.length) {
+    grid.innerHTML = `<div class="no-results"><p>No universities match.</p></div>`;
+  } else {
+    grid.innerHTML = slice.map(u => {
+      const tier=(u.tier||'T3').toLowerCase();
+      const domain=(u.school_url||'').replace(/^https?:\/\//,'').replace(/\/$/,'');
+      return `
+      <a class="uni-card ${tier} fade-up" href="/university/${u.id}">
+        <div class="uni-card-accent"></div>
+        <div class="card-head">
+          <div>
+            <div class="card-name">${u.name}</div>
+            <div class="card-loc">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 1 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              ${u.city||''}, ${u.state||''}
+            </div>
+          </div>
+          ${tierTag(u.tier)}
+        </div>
+        <div class="card-stats">
+          <div class="card-stat"><div class="card-stat-val">${u.acceptance_rate?(u.acceptance_rate>1?Math.round(u.acceptance_rate):Math.round(u.acceptance_rate*100))+'%':'—'}</div><div class="card-stat-lbl">Acceptance</div></div>
+          <div class="card-stat"><div class="card-stat-val">${fmtD(u.in_state_tuition)}</div><div class="card-stat-lbl">Tuition</div></div>
+          <div class="card-stat"><div class="card-stat-val">${fmt(u.student_size)}</div><div class="card-stat-lbl">Students</div></div>
+          <div class="card-stat"><div class="card-stat-val">${fmtD(u.median_earnings)}</div><div class="card-stat-lbl">Med. Earnings</div></div>
+        </div>
+        <div class="card-foot">
+          <span class="card-domain">${domain||'—'}</span>
+          <div class="card-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg></div>
+        </div>
+      </a>`;
+    }).join('');
+  }
+  document.getElementById('loadMoreRow').style.display = filtered.length > displayCount ? 'block' : 'none';
+}
+</script>
+{% endblock %}

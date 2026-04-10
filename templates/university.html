@@ -1,0 +1,691 @@
+
+{% extends "base.html" %}
+{% block title %}{{ u.name }} — UniSearch{% endblock %}
+{% block body %}
+
+<!-- ── Hero ───────────────────────────────────────────────────── -->
+<section class="profile-hero">
+  <div class="profile-hero-mesh"></div>
+  <div class="profile-hero-inner">
+    <a href="javascript:history.back()" class="profile-back">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+      Back to results
+    </a>
+    <div class="profile-top-row">
+      <div class="profile-title-block">
+        <div class="profile-badges" id="profileBadges">
+          {% if u.state %}<span class="profile-state-pill">{{ u.state }}</span>{% endif %}
+          <span id="controlPill"></span>
+        </div>
+        <h1 class="profile-name">{{ u.name }}</h1>
+        <div class="profile-city">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 1 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          {{ u.city or '' }}{% if u.city and u.state %}, {% endif %}{{ u.state or '' }}
+        </div>
+        {% if u.school_url %}
+        <a href="{{ u.school_url }}" target="_blank" class="profile-url">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          {{ u.school_url.replace('https://','').replace('http://','').rstrip('/') }}
+        </a>
+        {% endif %}
+      </div>
+      <div class="profile-action-btns">
+        <button class="btn-outline-white" id="favBtn" onclick="toggleFav()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          Save
+        </button>
+        <button class="btn-gold" onclick="window.location.href='/compare?add={{ u.id }}'">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          Compare
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPI strip -->
+  <div class="kpi-strip">
+    <div class="kpi-inner" id="kpiStrip">
+      <div class="kpi-item empty"><div class="kpi-val">—</div><div class="kpi-lbl">Acceptance Rate</div></div>
+      <div class="kpi-item empty"><div class="kpi-val">—</div><div class="kpi-lbl">In-State Tuition</div></div>
+      <div class="kpi-item empty"><div class="kpi-val">—</div><div class="kpi-lbl">Out-of-State Tuition</div></div>
+      <div class="kpi-item empty"><div class="kpi-val">—</div><div class="kpi-lbl">Total Students</div></div>
+      <div class="kpi-item empty"><div class="kpi-val">—</div><div class="kpi-lbl">4-yr Grad Rate</div></div>
+      <div class="kpi-item empty"><div class="kpi-val">—</div><div class="kpi-lbl">Median Earnings</div></div>
+    </div>
+  </div>
+  <div class="profile-hero-bottom-line"></div>
+</section>
+
+<!-- ── Body ───────────────────────────────────────────────────── -->
+<div class="profile-body" id="profileBody">
+
+  <!-- 1. QUICK SNAPSHOT (full width) -->
+  <div class="pc pc-full" id="snapshotCard">
+    <div class="pc-title">
+      <svg class="pc-title-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      Quick Snapshot
+    </div>
+    <div class="snapshot-grid" id="snapshotGrid">
+      <!-- filled by JS -->
+    </div>
+  </div>
+
+  <!-- 2. ADMISSIONS -->
+  <div class="pc fade-up delay-1" id="admissionsCard" style="display:none">
+    <div class="pc-title">
+      <svg class="pc-title-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Admissions
+    </div>
+    <table class="dt" id="admissionsTable"></table>
+  </div>
+
+  <!-- 3. COSTS & FINANCIAL AID -->
+  <div class="pc fade-up delay-2" id="costsCard" style="display:none">
+    <div class="pc-title">
+      <svg class="pc-title-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 1 0 0 7h5a3.5 3.5 0 1 1 0 7H6"/></svg>
+      Costs &amp; Financial Aid
+    </div>
+    <table class="dt" id="costsTable"></table>
+  </div>
+
+  <!-- 4. STUDENT OUTCOMES -->
+  <div class="pc fade-up delay-1" id="outcomesCard" style="display:none">
+    <div class="pc-title">
+      <svg class="pc-title-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+      Student Outcomes
+    </div>
+    <table class="dt" id="outcomesTable"></table>
+  </div>
+
+  <!-- 5. STUDENT LIFE -->
+  <div class="pc fade-up delay-2" id="lifeCard" style="display:none">
+    <div class="pc-title">
+      <svg class="pc-title-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      Student Life
+    </div>
+    <table class="dt" id="lifeTable"></table>
+  </div>
+
+  <!-- 6. CARNEGIE CLASSIFICATION (full width) -->
+  <div class="pc pc-full carnegie-card" id="carnegieSection" style="display:none">
+    <div class="pc-title">
+      <svg class="pc-title-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
+      Carnegie Classification
+      <span class="pc-badge">OFFICIAL 2021</span>
+    </div>
+    <div id="carnegieGrid"></div>
+    <div class="carnegie-foot">
+      <a id="carnegieVerifyLink" href="#" target="_blank" class="vlink">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline;vertical-align:middle;margin-right:4px"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        Verify on Carnegie site
+      </a>
+      <span class="carnegie-attr">Carnegie Classification of Institutions of Higher Education® — ACE/Carnegie (CC BY-NC-SA)</span>
+    </div>
+  </div>
+
+  <!-- 7. LOCATION & INFO (full width) -->
+  <div class="pc pc-full fade-up" id="locationCard">
+    <div class="pc-title">
+      <svg class="pc-title-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 1 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+      Location &amp; Info
+    </div>
+    <div class="loc-grid">
+      <div class="loc-item"><div class="loc-item-lbl">City</div><div class="loc-item-val">{{ u.city or '—' }}</div></div>
+      <div class="loc-item"><div class="loc-item-lbl">State</div><div class="loc-item-val">{{ u.state or '—' }}</div></div>
+      <div class="loc-item">
+        <div class="loc-item-lbl">Website</div>
+        <div class="loc-item-val">
+          {% if u.school_url %}<a href="{{ u.school_url }}" target="_blank">{{ u.school_url }}</a>{% else %}—{% endif %}
+        </div>
+      </div>
+      <div class="loc-item"><div class="loc-item-lbl">Institution Type</div><div class="loc-item-val" id="locControl">—</div></div>
+      <div class="loc-item"><div class="loc-item-lbl">Carnegie Tier</div><div class="loc-item-val" id="locTier">—</div></div>
+      <div class="loc-item"><div class="loc-item-lbl">Data Sections</div><div class="loc-item-val" id="allSectionsCount">—</div></div>
+    </div>
+  </div>
+
+  <!-- 8. PROGRAMS & MAJORS (full width) -->
+  <div class="pc pc-full" id="programsSection">
+    <div class="pc-title" style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap">
+      <svg class="pc-title-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+      Programs &amp; Majors
+      <span class="pc-badge" style="background:rgba(201,146,42,.15);color:var(--gold)">AI-POWERED</span>
+      <button onclick="loadPrograms(true)" id="progRefreshBtn" style="margin-left:auto;font-size:11px;padding:4px 12px;background:none;border:1.5px solid var(--border);border-radius:20px;cursor:pointer;color:var(--text-muted);transition:all .15s" onmouseover="this.style.borderColor='var(--navy)';this.style.color='var(--navy)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'">
+        🔄 Regenerate
+      </button>
+    </div>
+    <div id="programsBody">
+      <div class="programs-loading">
+        <div class="prog-spinner"></div>
+        <span>Loading programs… this may take a few seconds on first visit</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 9. AWARDS & RECOGNITION -->
+  <div class="pc pc-full" id="awardsSection" style="display:none">
+    <div class="pc-title">
+      <svg class="pc-title-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></svg>
+      Awards &amp; Recognition
+    </div>
+    <ul class="award-list" id="awardsList"></ul>
+  </div>
+
+</div>
+
+<style>
+/* ── Programs Section ───────────────────────────────────────── */
+.programs-loading {
+  display:flex; align-items:center; gap:.75rem;
+  padding:2rem; color:var(--text-muted); font-size:14px;
+}
+@keyframes spin { to{transform:rotate(360deg)} }
+.prog-spinner {
+  width:18px; height:18px; border-radius:50%;
+  border:2px solid var(--border); border-top-color:var(--navy);
+  animation:spin .7s linear infinite; flex-shrink:0;
+}
+.programs-error {
+  padding:1.5rem; color:var(--text-muted); font-size:13px;
+  background:var(--cream); border-radius:10px; margin:.5rem;
+}
+
+/* Featured Program Banner */
+.featured-program {
+  background:linear-gradient(135deg, var(--navy) 0%, #16326b 100%);
+  border-radius:14px; padding:1.5rem 1.75rem;
+  margin-bottom:1.5rem; border:1px solid rgba(201,146,42,.25);
+  display:flex; gap:1.25rem; align-items:flex-start;
+}
+.featured-star {
+  width:48px; height:48px; border-radius:10px; flex-shrink:0;
+  background:linear-gradient(135deg,var(--gold),var(--gold-light));
+  display:flex; align-items:center; justify-content:center; font-size:22px;
+}
+.featured-label { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.1em; color:var(--gold); margin-bottom:.35rem; }
+.featured-name  { font-family:'Cormorant Garamond',serif; font-size:1.6rem; font-weight:700; color:#fff; line-height:1.2; margin-bottom:.35rem; }
+.featured-category { display:inline-block; font-size:11px; font-weight:700; padding:3px 10px; border-radius:20px; margin-bottom:.5rem; background:rgba(255,255,255,.12); color:rgba(255,255,255,.7); }
+.featured-desc  { font-size:14px; color:rgba(255,255,255,.75); line-height:1.6; margin-bottom:.5rem; }
+.featured-rep   { font-size:12.5px; color:var(--gold); font-style:italic; display:flex; align-items:center; gap:.4rem; }
+
+/* Top 20 Section */
+.top20-section  { margin-bottom:1.75rem; }
+.top20-title    { font-size:13px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; color:var(--text-mid); margin-bottom:.85rem; display:flex; align-items:center; gap:.5rem; }
+.top20-grid     { display:grid; grid-template-columns:repeat(auto-fill, minmax(260px,1fr)); gap:8px; }
+.top20-card     {
+  display:flex; align-items:center; gap:.75rem;
+  background:#fff; border:1.5px solid var(--border); border-radius:11px;
+  padding:.75rem 1rem; transition:all .15s;
+}
+.top20-card:hover { border-color:var(--gold); box-shadow:0 3px 12px rgba(201,146,42,.12); transform:translateY(-1px); }
+.top20-rank     { width:28px; height:28px; border-radius:8px; background:var(--navy); color:#fff; font-size:11px; font-weight:800; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.top20-rank.gold { background:linear-gradient(135deg,var(--gold),var(--gold-light)); color:var(--navy); }
+.top20-rank.silver { background:#94a3b8; }
+.top20-rank.bronze { background:#b87333; }
+.top20-info     { flex:1; min-width:0; }
+.top20-name     { font-size:13px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.top20-meta     { font-size:11px; color:var(--text-muted); margin-top:2px; }
+.top20-lvl-badge { font-size:10px; font-weight:600; padding:2px 7px; border-radius:10px; background:var(--cream); color:var(--text-mid); white-space:nowrap; flex-shrink:0; }
+
+/* Degree level tabs */
+.prog-level-tabs { display:flex; gap:0; margin-bottom:1.25rem; background:var(--cream); border:1.5px solid var(--border); border-radius:10px; padding:3px; width:fit-content; }
+.prog-level-tab  { font-size:12px; font-weight:600; padding:6px 18px; border-radius:7px; border:none; background:none; color:var(--text-mid); cursor:pointer; transition:all .15s; white-space:nowrap; }
+.prog-level-tab.active { background:#fff; color:var(--navy); box-shadow:0 1px 4px rgba(0,0,0,.08); }
+
+/* Category filter pills */
+.prog-filter-row { display:flex; gap:.4rem; flex-wrap:wrap; margin-bottom:1.1rem; }
+.prog-tab { font-size:11.5px; font-weight:600; padding:4px 12px; border-radius:20px; border:1.5px solid var(--border); background:var(--cream); color:var(--text-mid); cursor:pointer; transition:all .15s; }
+.prog-tab:hover, .prog-tab.active { background:var(--navy); color:#fff; border-color:var(--navy); }
+
+/* Programs grid */
+.programs-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(230px,1fr)); gap:9px; }
+.prog-card { background:var(--cream); border:1.5px solid var(--border); border-radius:12px; padding:.9rem 1rem; transition:all .15s; }
+.prog-card:hover { border-color:var(--navy); background:#fff; box-shadow:0 4px 14px rgba(0,0,0,.07); transform:translateY(-1px); }
+.prog-card-cat  { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; margin-bottom:.3rem; }
+.prog-card-cat.stem       { color:#0369a1; }
+.prog-card-cat.business   { color:#b45309; }
+.prog-card-cat.health     { color:#15803d; }
+.prog-card-cat.arts       { color:#7c3aed; }
+.prog-card-cat.law        { color:#be123c; }
+.prog-card-cat.education  { color:#0891b2; }
+.prog-card-cat.social     { color:#9333ea; }
+.prog-card-cat.engineering{ color:#c2410c; }
+.prog-card-cat.other      { color:var(--text-muted); }
+.prog-card-name { font-size:13.5px; font-weight:700; color:var(--text); line-height:1.3; margin-bottom:.3rem; }
+.prog-card-desc { font-size:11.5px; color:var(--text-muted); line-height:1.5; }
+.prog-card-link {
+  display:inline-block; margin-top:.5rem;
+  font-size:11px; font-weight:700; color:var(--navy);
+  text-decoration:none; border-bottom:1.5px solid var(--gold);
+  transition:color .12s;
+}
+.prog-card-link:hover { color:var(--gold); }
+.prog-count-note { font-size:11.5px; color:var(--text-muted); margin-top:1rem; text-align:right; font-style:italic; }
+
+/* Level summary bar */
+.level-summary { display:flex; gap:.75rem; margin-bottom:1.5rem; flex-wrap:wrap; }
+.level-pill { display:flex; align-items:center; gap:.4rem; background:var(--cream); border:1.5px solid var(--border); border-radius:20px; padding:5px 14px; font-size:12px; font-weight:600; color:var(--text-mid); }
+.level-pill span { background:var(--navy); color:#fff; border-radius:10px; padding:1px 7px; font-size:11px; }
+</style>
+
+<div class="data-note">
+  Data sourced from the U.S. Department of Education College Scorecard API and official university websites.
+  Carnegie Classifications: <em>Carnegie Classification of Institutions of Higher Education®, 2021 edition. Indiana University Center for Postsecondary Research / ACE.</em>
+  <a href="https://carnegieclassifications.acenet.edu" target="_blank">carnegieclassifications.acenet.edu</a>
+  (CC BY-NC-SA). Always verify on the <a href="{{ u.school_url or '#' }}" target="_blank">official university website</a>.
+</div>
+
+<script>
+const uid = {{ u.id }};
+const schoolUrl = "{{ (u.school_url or '') | replace('"','') }}".replace(/\/+$/, '');
+let favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
+
+// ── Favorites ──────────────────────────────────────────────────
+function toggleFav() {
+  const btn = document.getElementById('favBtn');
+  const i = favorites.indexOf(uid);
+  if (i === -1) {
+    favorites.push(uid);
+    btn.classList.add('active');
+    btn.innerHTML = `<svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg> Saved`;
+  } else {
+    favorites.splice(i, 1);
+    btn.classList.remove('active');
+    btn.innerHTML = `<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg> Save`;
+  }
+  localStorage.setItem('favorites', JSON.stringify(favorites));
+}
+if (favorites.includes(uid)) {
+  const btn = document.getElementById('favBtn');
+  btn.classList.add('active');
+  btn.innerHTML = `<svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg> Saved`;
+}
+
+// ── Helpers ────────────────────────────────────────────────────
+function fmtD(n)     { return n ? '$' + Number(n).toLocaleString() : '—'; }
+function fmtPct(n)   { if (!n) return '—'; return (n > 1 ? Math.round(n) : Math.round(n*100)) + '%'; }
+function fmtSpend(n) { if (!n) return '—'; return n>=1e9?'$'+(n/1e9).toFixed(2)+'B':n>=1e6?'$'+(n/1e6).toFixed(1)+'M':n>=1e3?'$'+(n/1e3).toFixed(0)+'K':'$'+n; }
+function fmtNum(n)   { if (!n) return '—'; return n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(0)+'K':Number(n).toLocaleString(); }
+function cdot(c)     { if (!c) return ''; return `<span class="cdot ${c>=0.8?'cdot-hi':c>=0.5?'cdot-mid':'cdot-lo'}" title="Confidence ${Math.round(c*100)}%"></span>`; }
+function isGenericUrl(url) {
+  if (!url) return true;
+  const c = url.replace(/^https?:\/\//,'').replace(/\/+$/,'');
+  const s = schoolUrl.replace(/^https?:\/\//,'').replace(/\/+$/,'');
+  return c === s || !url.includes('/', url.indexOf('//')+2);
+}
+function vlink(url, label, cls='') {
+  if (!url || isGenericUrl(url)) return '';
+  return `<a href="${url}" target="_blank" class="vlink ${cls}">${label}</a>`;
+}
+function tierTag(tier) {
+  if (!tier) return '';
+  const c={T1:'t1',T2:'t2',T3:'t3'}, l={T1:'T1 · R1 Research',T2:'T2 · R2 Research',T3:'T3'};
+  return `<span class="tier-tag ${c[tier]||'t3'}"><span class="dot"></span>${l[tier]||tier}</span>`;
+}
+function dtRow(label, val, sourceUrl, conf, extractedAt, extractor) {
+  const hasVerify = sourceUrl && !isGenericUrl(sourceUrl);
+  return `
+  <tr>
+    <td class="dt-lbl">${label} ${cdot(conf)}</td>
+    <td class="dt-val">${val || '—'}</td>
+    <td class="dt-act">${hasVerify ? `<a href="${sourceUrl}" target="_blank" class="vlink">Verify ↗</a>` : ''}</td>
+  </tr>
+  ${extractedAt ? `<tr class="dt-meta-row"><td colspan="3"><span class="dt-meta">${extractedAt}${extractor ? ' · '+extractor : ''}</span></td></tr>` : ''}`;
+}
+
+// ── Snapshot items ─────────────────────────────────────────────
+function snapItem(icon, label, val, sub) {
+  return `
+  <div class="snap-item">
+    <div class="snap-icon">${icon}</div>
+    <div class="snap-val">${val}</div>
+    <div class="snap-label">${label}</div>
+    ${sub ? `<div class="snap-sub">${sub}</div>` : ''}
+  </div>`;
+}
+
+// ── Main boot ──────────────────────────────────────────────────
+async function boot() {
+  const res = await fetch(`/api/university/${uid}`);
+  if (!res.ok) { document.getElementById('profileBody').innerHTML = '<div style="padding:3rem;text-align:center;color:var(--text-muted)">Could not load data.</div>'; return; }
+  const d = await res.json();
+
+  // ── Inject tier badge & control pill
+  const badges = document.getElementById('profileBadges');
+  if (d.tier) {
+    const el = document.createElement('span');
+    el.innerHTML = tierTag(d.tier);
+    badges.appendChild(el.firstElementChild);
+  }
+  const ctrl = document.getElementById('controlPill');
+  const ctrlVal = d.carnegie?.institution_control || d.institution_type_inferred || '';
+  if (ctrlVal) {
+    ctrl.className = 'profile-control-pill';
+    ctrl.textContent = ctrlVal;
+  }
+
+  // ── KPI strip
+  const facts = d.facts || {};
+  // DB section names: 'admissions', 'tuition', 'student_life', 'outcomes'
+  const pick = (sec, lbl) => (facts[sec]||[]).find(x => x.label?.toLowerCase().includes(lbl.toLowerCase()));
+  const ar = pick('admissions','acceptance');
+  const it = pick('tuition','in-state') || pick('tuition','in_state');
+  const ot = pick('tuition','out-of-state') || pick('tuition','out_of_state');
+  const ss = pick('student_life','enrollment') || pick('student_life','students');
+  const gr = pick('outcomes','graduation');
+  const me = pick('outcomes','earnings');
+
+  const kpis = [
+    { val: ar ? fmtPct(ar.value_numeric ?? ar.value) : (d.acceptance_rate ? fmtPct(d.acceptance_rate) : '—'), lbl:'Acceptance Rate',    src: ar?.source_url },
+    { val: it ? fmtD(it.value_numeric   ?? it.value) : '—',  lbl:'In-State Tuition',  src: it?.source_url },
+    { val: ot ? fmtD(ot.value_numeric   ?? ot.value) : '—',  lbl:'Out-of-State',      src: ot?.source_url },
+    { val: ss ? fmtNum(ss.value_numeric ?? ss.value) : '—',  lbl:'Total Students',    src: ss?.source_url },
+    { val: gr ? fmtPct(gr.value_numeric ?? gr.value) : '—',  lbl:'4-yr Grad Rate',    src: gr?.source_url },
+    { val: me ? fmtD(me.value_numeric   ?? me.value) : (d.median_earnings ? fmtD(d.median_earnings) : '—'), lbl:'Median Earnings', src: me?.source_url },
+  ];
+  document.getElementById('kpiStrip').innerHTML = kpis.map(k => `
+    <div class="kpi-item${k.val==='—'?' empty':''}">
+      <div class="kpi-val">${k.val}</div>
+      <div class="kpi-lbl">${k.lbl}</div>
+      ${k.src && !isGenericUrl(k.src) ? `<a href="${k.src}" target="_blank" class="kpi-link">Verify ↗</a>` : ''}
+    </div>`).join('');
+
+  // ── Quick Snapshot grid
+  const cc = d.carnegie || {};
+  const snapItems = [
+    { icon:'🎓', label:'Acceptance Rate',    val: kpis[0].val },
+    { icon:'💰', label:'In-State Tuition',   val: kpis[1].val },
+    { icon:'🏫', label:'Out-of-State',       val: kpis[2].val },
+    { icon:'👥', label:'Total Students',     val: kpis[3].val },
+    { icon:'📈', label:'Graduation Rate',    val: kpis[4].val },
+    { icon:'💼', label:'Median Earnings',    val: kpis[5].val },
+    { icon:'🔬', label:'Carnegie Tier',      val: cc.tier_label || d.tier || 'T3' },
+    { icon:'🏛️', label:'Institution Type',   val: cc.institution_control || d.institution_type_inferred || '—' },
+  ];
+  // Add research stats if available
+  if (cc.research_spending) snapItems.push({ icon:'🔭', label:'Annual R&D Spend', val: fmtSpend(cc.research_spending) });
+  if (cc.faculty_count)     snapItems.push({ icon:'👩‍🏫', label:'Full-Time Faculty',  val: Number(cc.faculty_count).toLocaleString() });
+  if (cc.research_doctorates) snapItems.push({ icon:'📜', label:'Research Doctorates', val: Number(cc.research_doctorates).toLocaleString() });
+
+  document.getElementById('snapshotGrid').innerHTML = snapItems.map(s => `
+    <div class="snap-item">
+      <div class="snap-icon">${s.icon}</div>
+      <div class="snap-val">${s.val}</div>
+      <div class="snap-label">${s.label}</div>
+    </div>`).join('');
+
+  // ── Data sections
+  const SECTIONS = {
+    admissions:   ['admissionsCard','admissionsTable'],
+    tuition:      ['costsCard','costsTable'],
+    outcomes:     ['outcomesCard','outcomesTable'],
+    student_life: ['lifeCard','lifeTable'],
+  };
+  let sectionCount = 0;
+  for (const [sec, [cardId, tableId]] of Object.entries(SECTIONS)) {
+    const items = facts[sec] || [];
+    if (!items.length) continue;
+    sectionCount++;
+    document.getElementById(cardId).style.display = 'block';
+    document.getElementById(tableId).innerHTML = items.map(f =>
+      dtRow(f.label, f.value, f.source_url, f.confidence, f.extracted_at, f.extractor)
+    ).join('');
+  }
+  document.getElementById('allSectionsCount').textContent = sectionCount + ' sections loaded';
+
+  // ── Carnegie
+  renderCarnegie(cc);
+
+  // ── Location extras
+  if (d.tier) document.getElementById('locTier').innerHTML = tierTag(d.tier);
+  const ctrlDisplay = d.carnegie?.institution_control || d.institution_type_inferred || '—';
+  document.getElementById('locControl').textContent = ctrlDisplay;
+
+  // ── Awards (render last)
+  const allAwards = [...(d.awards||[]), ...(d.rankings||[])];
+  renderAwards(allAwards);
+}
+boot();
+
+// ── Carnegie render ────────────────────────────────────────────
+function renderCarnegie(cc) {
+  if (!cc || (!cc.tier_label && !cc.institutional_classification)) return;
+  const tierCls = (cc.tier_label||'T3').toLowerCase();
+  const tierLabels = {T1:'R1 — Very High Research Activity', T2:'R2 — High Research Activity', T3:'Other Classification'};
+
+  let html = `
+  <div class="tier-hero-row">
+    <div class="tier-badge-xl ${tierCls}">${cc.tier_label||'T3'}</div>
+    <div class="tier-hero-text">
+      <div class="tier-hero-label">${tierLabels[cc.tier_label] || cc.tier_reason || ''}</div>
+      <div class="tier-hero-sub">${cc.tier_reason || ''}</div>
+    </div>
+    ${cc.carnegie_page_url ? `<a href="${cc.carnegie_page_url}" target="_blank" class="vlink" style="margin-left:auto;align-self:center">Verify on Carnegie ↗</a>` : ''}
+  </div>`;
+
+  const hasResearch = cc.research_spending || cc.research_doctorates || cc.faculty_count || cc.total_enrollment;
+  if (hasResearch) {
+    html += `<div class="research-stats">`;
+    if (cc.research_spending) html += `<div class="rs-card"><svg class="rs-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 1 0 0 7h5a3.5 3.5 0 1 1 0 7H6"/></svg><div><div class="rs-val">${fmtSpend(cc.research_spending)}</div><div class="rs-lbl">Annual R&D Spending</div></div></div>`;
+    if (cc.research_doctorates) html += `<div class="rs-card"><svg class="rs-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg><div><div class="rs-val">${Number(cc.research_doctorates).toLocaleString()}</div><div class="rs-lbl">Research Doctorates</div></div></div>`;
+    if (cc.faculty_count) html += `<div class="rs-card"><svg class="rs-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg><div><div class="rs-val">${Number(cc.faculty_count).toLocaleString()}</div><div class="rs-lbl">Full-Time Faculty</div></div></div>`;
+    if (cc.total_enrollment) html += `<div class="rs-card"><svg class="rs-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><div><div class="rs-val">${Number(cc.total_enrollment).toLocaleString()}</div><div class="rs-lbl">Total Enrollment</div></div></div>`;
+    html += `</div>`;
+  }
+  const fields = [
+    ['Carnegie Classification', cc.institutional_classification],
+    ['Institution Type', cc.institution_control],
+    ['Size & Setting', cc.size_setting],
+    ['Basic Classification', cc.basic_classification],
+  ].filter(([,v]) => v);
+  if (fields.length) {
+    html += `<div class="carnegie-fields-grid">`+fields.map(([l,v])=>`<div class="cf-item"><div class="cf-lbl">${l}</div><div class="cf-val">${v}</div></div>`).join('')+`</div>`;
+  }
+  if (cc.designations) {
+    html += `<div class="desigs-row">`+cc.designations.split(', ').map(d=>`<span class="desig-pill">${d}</span>`).join('')+`</div>`;
+  }
+  document.getElementById('carnegieGrid').innerHTML = html;
+  if (cc.carnegie_page_url) document.getElementById('carnegieVerifyLink').href = cc.carnegie_page_url;
+  if (cc.extracted_at) {
+    document.querySelector('.carnegie-foot').insertAdjacentHTML('beforeend',`<span class="carnegie-attr">Last updated: ${cc.extracted_at}</span>`);
+  }
+  document.getElementById('carnegieSection').style.display = 'block';
+}
+
+// ── Programs Section ───────────────────────────────────────────
+const CAT_COLORS = {
+  'stem':'stem','business':'business',
+  'health & medicine':'health','health':'health',
+  'arts & humanities':'arts','arts':'arts',
+  'law & policy':'law','law':'law',
+  'education':'education',
+  'social sciences':'social','social':'social',
+  'engineering':'engineering',
+};
+const CAT_ICONS = {
+  'stem':'🔬','business':'💼','health & medicine':'🏥','health':'🏥',
+  'arts & humanities':'🎨','arts':'🎨','law & policy':'⚖️','law':'⚖️',
+  'education':'📚','social sciences':'🌐','social':'🌐','engineering':'⚙️',
+};
+function catCls(cat)  { return cat ? (CAT_COLORS[cat.toLowerCase()] || 'other') : 'other'; }
+function catIcon(cat) { return cat ? (CAT_ICONS[cat.toLowerCase()] || '📖') : '📖'; }
+
+let allPrograms  = [];
+let activeLevel  = 'All';
+let activeCategory = 'All';
+
+async function loadPrograms(forceReset = false) {
+  document.getElementById('programsBody').innerHTML = `
+    <div class="programs-loading">
+      <div class="prog-spinner"></div>
+      <span>${forceReset ? 'Regenerating full program list…' : 'Loading programs… first visit may take 5–8 seconds'}</span>
+    </div>`;
+  try {
+    if (forceReset) {
+      await fetch(`/api/university/${uid}/programs/reset`, { method:'POST' });
+    }
+    const res  = await fetch(`/api/university/${uid}/programs`);
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error || 'Failed to load');
+    allPrograms = Array.isArray(data) ? data : [];
+    activeLevel = 'All'; activeCategory = 'All';
+    renderPrograms();
+  } catch(e) {
+    document.getElementById('programsBody').innerHTML = `
+      <div class="programs-error">
+        Could not load programs: ${e.message}<br><br>
+        <button onclick="loadPrograms(true)" style="padding:8px 18px;background:var(--navy);color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600">🔄 Try Again</button>
+      </div>`;
+  }
+}
+
+function renderPrograms() {
+  if (!allPrograms.length) {
+    document.getElementById('programsBody').innerHTML = '<div class="programs-error">No programs data available.</div>';
+    return;
+  }
+
+  const featured  = allPrograms.find(p => p.is_featured);
+  const top20     = allPrograms.filter(p => p.top20_rank).sort((a,b) => a.top20_rank - b.top20_rank);
+  const rest      = allPrograms.filter(p => !p.is_featured);
+
+  // Level counts
+  const levels = ['Undergraduate','Graduate','Doctoral'];
+  const levelCounts = {};
+  levels.forEach(l => levelCounts[l] = rest.filter(p => p.degree_level === l).length);
+
+  // Filter by level + category
+  const levelFiltered = activeLevel === 'All' ? rest : rest.filter(p => p.degree_level === activeLevel);
+  const cats = ['All', ...new Set(levelFiltered.map(p => p.category).filter(Boolean).sort())];
+  const shown = activeCategory === 'All' ? levelFiltered : levelFiltered.filter(p => p.category === activeCategory);
+
+  let html = '';
+
+  // ── Featured Banner
+  if (featured) {
+    html += `
+    <div class="featured-program">
+      <div class="featured-star">${catIcon(featured.category)}</div>
+      <div style="flex:1">
+        <div class="featured-label">⭐ Most Reputed Program</div>
+        <div class="featured-name">${featured.name}</div>
+        <span class="featured-category">${featured.category||'Program'}</span>
+        ${featured.degree_level ? `<span class="featured-category" style="margin-left:.4rem">${featured.degree_level}</span>` : ''}
+        ${featured.description  ? `<div class="featured-desc">${featured.description}</div>` : ''}
+        ${featured.reputation_note ? `<div class="featured-rep">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          ${featured.reputation_note}
+        </div>` : ''}
+        ${featured.program_url ? `<a href="${featured.program_url}" target="_blank" style="display:inline-flex;align-items:center;gap:6px;margin-top:.75rem;padding:7px 16px;background:var(--gold);color:var(--navy);border-radius:8px;font-size:12px;font-weight:700;text-decoration:none">
+          View Program Page →
+        </a>` : ''}
+      </div>
+    </div>`;
+  }
+
+  // ── Top 20 Programs
+  if (top20.length) {
+    html += `<div class="top20-section">
+      <div class="top20-title">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        Top 20 Programs at this University
+      </div>
+      <div class="top20-grid">`;
+    top20.forEach(p => {
+      const rankCls = p.top20_rank === 1 ? 'gold' : p.top20_rank <= 3 ? 'silver' : p.top20_rank <= 5 ? 'bronze' : '';
+      const cardInner = `
+          <div class="top20-rank ${rankCls}">${p.top20_rank}</div>
+          <div class="top20-info">
+            <div class="top20-name">${p.name}</div>
+            <div class="top20-meta">${catIcon(p.category)} ${p.category||''}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
+            <div class="top20-lvl-badge">${p.degree_level||''}</div>
+            ${p.program_url ? `<span style="font-size:10px;color:var(--gold);font-weight:600">View →</span>` : ''}
+          </div>`;
+      if (p.program_url) {
+        html += `<a class="top20-card" href="${p.program_url}" target="_blank" style="text-decoration:none">${cardInner}</a>`;
+      } else {
+        html += `<div class="top20-card">${cardInner}</div>`;
+      }
+    });
+    html += `</div></div>`;
+  }
+
+  // ── Level summary pills
+  html += `<div class="level-summary">`;
+  html += `<div class="level-pill">📚 All <span>${rest.length}</span></div>`;
+  levels.forEach(l => {
+    if (levelCounts[l]) html += `<div class="level-pill">${l} <span>${levelCounts[l]}</span></div>`;
+  });
+  html += `</div>`;
+
+  // ── Degree level tabs
+  html += `<div class="prog-level-tabs">`;
+  ['All',...levels].forEach(l => {
+    const cnt = l === 'All' ? rest.length : levelCounts[l] || 0;
+    if (l !== 'All' && !cnt) return;
+    html += `<button class="prog-level-tab ${l===activeLevel?'active':''}" onclick="filterLevel('${l}')">${l} (${cnt})</button>`;
+  });
+  html += `</div>`;
+
+  // ── Category filter pills
+  html += `<div class="prog-filter-row">`;
+  cats.forEach(c => {
+    const cnt = c==='All' ? levelFiltered.length : levelFiltered.filter(p=>p.category===c).length;
+    html += `<button class="prog-tab ${c===activeCategory?'active':''}" onclick="filterCat('${c}')">${c} <span style="opacity:.55;font-weight:400">${cnt}</span></button>`;
+  });
+  html += `</div>`;
+
+  // ── Programs grid
+  if (!shown.length) {
+    html += `<div class="programs-error">No programs found for this filter.</div>`;
+  } else {
+    html += `<div class="programs-grid">`;
+    shown.forEach(p => {
+      const cardContent = `
+        <div class="prog-card-cat ${catCls(p.category)}">${catIcon(p.category)} ${p.category||'Program'}</div>
+        <div class="prog-card-name">${p.name}</div>
+        ${p.description ? `<div class="prog-card-desc">${p.description}</div>` : ''}
+        ${p.program_url ? `<a href="${p.program_url}" target="_blank" onclick="event.stopPropagation()" class="prog-card-link">View Program →</a>` : ''}
+      `;
+      html += `<div class="prog-card">${cardContent}</div>`;
+    });
+    html += `</div>`;
+  }
+
+  html += `<div class="prog-count-note">Showing ${shown.length} of ${rest.length} programs · AI-generated based on university data</div>`;
+  document.getElementById('programsBody').innerHTML = html;
+}
+
+function filterLevel(level) { activeLevel = level; activeCategory = 'All'; renderPrograms(); }
+function filterCat(cat)     { activeCategory = cat; renderPrograms(); }
+
+loadPrograms();
+
+
+function renderAwards(awards) {
+  if (!awards.length) return;
+  document.getElementById('awardsSection').style.display = 'block';
+  document.getElementById('awardsList').innerHTML = awards.map(a => {
+    const links = [];
+    if (a.source_url_publisher && !isGenericUrl(a.source_url_publisher))
+      links.push(`<a href="${a.source_url_publisher}" target="_blank" class="vlink">${a.publisher_name ? 'Verify · '+a.publisher_name : 'Verify Source'} ↗</a>`);
+    if (a.source_url_university && !isGenericUrl(a.source_url_university))
+      links.push(`<a href="${a.source_url_university}" target="_blank" class="vlink vlink-sec">University Page ↗</a>`);
+    if (!links.length && a.source_url && !isGenericUrl(a.source_url))
+      links.push(`<a href="${a.source_url}" target="_blank" class="vlink">Verify ↗</a>`);
+    if (!links.length) links.push(`<span class="unverified-tag">Unverified</span>`);
+    const bullet = a.description?.toLowerCase().includes('rank') ? '🏆' : '★';
+    return `
+    <li class="award-item">
+      <span class="award-bullet">${bullet}</span>
+      <div class="award-body">
+        <div class="award-text">${a.description||''}</div>
+        <div class="award-links">${links.join('')}</div>
+      </div>
+    </li>`;
+  }).join('');
+}
+</script>
+{% endblock %}

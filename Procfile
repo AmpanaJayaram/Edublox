@@ -1,0 +1,1 @@
+web: uv run gunicorn "app:create_app()"
